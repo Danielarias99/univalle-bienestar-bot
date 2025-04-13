@@ -8,7 +8,7 @@
 import express from "express";
 import axios from "axios";
 import 'dotenv/config';
-import QueryController from './src/controllers/queryController.js';
+import QueryController from './controllers/queryController.js';
 
 const app = express();
 app.use(express.json());
