@@ -57,25 +57,25 @@ class WebhookController {
 
       // Adaptar el formato del mensaje
       const adaptedMessage = {
-        from: mensaje.de || mensaje.from,
+        from: mensaje.from || mensaje.de,
         id: mensaje.id,
-        timestamp: mensaje["marca de tiempo"] || mensaje.timestamp,
-        type: mensaje.tipo || mensaje.type,
-        text: mensaje.texto ? { 
-          body: mensaje.texto.cuerpo || mensaje.texto.body 
-        } : undefined,
-        interactive: mensaje.interactivo || mensaje.interactive ? {
-          type: (mensaje.interactivo || mensaje.interactive).tipo || (mensaje.interactivo || mensaje.interactive).type,
-          button_reply: (mensaje.interactivo || mensaje.interactive).respuesta_boton || (mensaje.interactivo || mensaje.interactive).button_reply ? {
-            id: ((mensaje.interactivo || mensaje.interactive).respuesta_boton || (mensaje.interactivo || mensaje.interactive).button_reply).id,
-            title: ((mensaje.interactivo || mensaje.interactive).respuesta_boton || (mensaje.interactivo || mensaje.interactive).button_reply).titulo || ((mensaje.interactivo || mensaje.interactive).respuesta_boton || (mensaje.interactivo || mensaje.interactive).button_reply).title
+        timestamp: mensaje.timestamp || mensaje["marca de tiempo"],
+        type: mensaje.type || mensaje.tipo,
+        text: mensaje.text || (mensaje.texto ? {
+          body: mensaje.texto.cuerpo || mensaje.texto.body
+        } : undefined),
+        interactive: mensaje.interactive || mensaje.interactivo ? {
+          type: (mensaje.interactive || mensaje.interactivo).type || (mensaje.interactive || mensaje.interactivo).tipo,
+          button_reply: (mensaje.interactive || mensaje.interactivo).button_reply || (mensaje.interactive || mensaje.interactivo).respuesta_boton ? {
+            id: ((mensaje.interactive || mensaje.interactivo).button_reply || (mensaje.interactive || mensaje.interactivo).respuesta_boton).id,
+            title: ((mensaje.interactive || mensaje.interactivo).button_reply || (mensaje.interactive || mensaje.interactivo).respuesta_boton).title || ((mensaje.interactive || mensaje.interactivo).button_reply || (mensaje.interactive || mensaje.interactivo).respuesta_boton).titulo
           } : undefined
         } : undefined
       };
 
       const adaptedSenderInfo = contacto ? {
         profile: {
-          name: contacto.perfil?.nombre || contacto.profile?.name
+          name: contacto.profile?.name || contacto.perfil?.nombre
         },
         wa_id: contacto.wa_id
       } : undefined;
