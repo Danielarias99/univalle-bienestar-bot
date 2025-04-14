@@ -14,18 +14,10 @@ import { dirname, join } from 'path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Importar el controlador usando ruta absoluta
-const { default: QueryController } = await import(
-    join(__dirname, 'src', 'controllers', 'queryController.js')
-);
-
 const app = express();
 app.use(express.json());
 
-const { WEBHOOK_VERIFY_TOKEN, API_TOKEN, BUSINESS_PHONE, API_VERSION, PORT, DEEPSEEK_API_KEY } = process.env;
-
-// Inicializar el controlador de consultas
-const queryController = new QueryController(DEEPSEEK_API_KEY);
+const { WEBHOOK_VERIFY_TOKEN, API_TOKEN, BUSINESS_PHONE, API_VERSION, PORT } = process.env;
 
 app.post("/webhook", async (req, res) => {
   // log incoming messages
@@ -37,12 +29,6 @@ app.post("/webhook", async (req, res) => {
   // check if the incoming message contains text
   if (message?.type === "text") {
     let responseText = "Echo: " + message.text.body;
-
-    // Intentar procesar como consulta
-    const queryResponse = await queryController.handleQuery(message.text.body);
-    if (queryResponse) {
-      responseText = queryResponse;
-    }
 
     // send a reply message
     await axios({
