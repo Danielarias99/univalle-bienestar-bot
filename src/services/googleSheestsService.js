@@ -27,17 +27,33 @@ async function addRowToSheet(auth, spreadsheetId, values, sheetName) {
 // 👉 Para reservas (hoja principal)
 const appendToSheet = async (data) => {
   try {
+    console.log('📝 Iniciando proceso de guardado en Sheets...');
+    console.log('📊 Datos a guardar:', data);
+
     const auth = new google.auth.GoogleAuth({
       keyFile: path.join(process.cwd(), "src/credentials", "credentials.json"),
       scopes: ["https://www.googleapis.com/auth/spreadsheets"],
     });
 
+    console.log('🔑 Autenticación configurada');
     const authClient = await auth.getClient();
+    console.log('👤 Cliente autenticado');
+
     const spreadsheetId = "1sNHbR0y52mlRE3z5E8JTaOMktUro3fPm6ZZPxXIUVZY";
-    await addRowToSheet(authClient, spreadsheetId, data, "Reservas GymBro");
+    console.log('📑 Intentando agregar datos a la hoja:', spreadsheetId);
+
+    const result = await addRowToSheet(authClient, spreadsheetId, data, "Reservas GymBro");
+    console.log('✅ Datos agregados correctamente:', result);
+
     return "Datos correctamente agregados a la hoja de reservas.";
   } catch (error) {
-    console.error(error);
+    console.error('❌ Error al agregar datos a Sheets:', error);
+    console.error('Detalles del error:', {
+      message: error.message,
+      stack: error.stack,
+      response: error.response?.data
+    });
+    throw error; // Propagar el error para manejarlo en messageHandler
   }
 };
 

@@ -1,6 +1,6 @@
 import { response } from 'express';
 import whatsappService from './whatsappService.js';
-import { appendToSheet, getAppointments, appendPauseToSheet } from './googleSheestsService.js';
+import { appendToSheet, getAppointments, appendPauseToSheet, consultarMembresia } from './googleSheestsService.js';
 import { preguntarAGemini } from './geminiService.js'; // ✅ Import correcto de Gemini
 
 
@@ -435,7 +435,7 @@ case 'awaitingDayInput':
                 );
               } else {
                 const row = [
-                  to, // 👈 Número de teléfono de WhatsApp (formato +573001234567)
+                  to,
                   state.name,
                   state.age,
                   state.day,
@@ -444,8 +444,10 @@ case 'awaitingDayInput':
                   new Date().toLocaleString("es-CO", { timeZone: "America/Bogota" })
                 ];
                 
-        
-                await appendToSheet(row);
+                console.log('Intentando guardar en sheets:', row);
+                const result = await appendToSheet(row);
+                console.log('Resultado de sheets:', result);
+                
                 await whatsappService.sendMessage(
                   to,
                   "✅ ¡Tu clase ha sido agendada y registrada! Nos pondremos en contacto contigo en un momento para confirmar la fecha y hora. ¡Nos vemos pronto! 💪",
