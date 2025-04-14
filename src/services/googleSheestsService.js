@@ -123,8 +123,8 @@ async function consultarMembresia(cedula) {
         }
     }
     try {
-        console.log(`[consultarMembresia] 🔍 Consultando Spreadsheet ID: ${spreadsheetId}, Range: Base de Datos`);
         const spreadsheetId = "1sNHbR0y52mlRE3z5E8JTaOMktUro3fPm6ZZPxXIUVZY";
+        console.log(`[consultarMembresia] 🔍 Consultando Spreadsheet ID: ${spreadsheetId}, Range: Base de Datos`);
         const response = await sheets.spreadsheets.values.get({
             spreadsheetId,
             range: "Base de Datos", // Asegúrate que este nombre sea EXACTO al de tu hoja
