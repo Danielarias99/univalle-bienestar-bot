@@ -7,19 +7,19 @@ class WebhookController {
       console.log('📥 Webhook recibido:', JSON.stringify(req.body, null, 2));
 
       // Adaptación para manejar campos en español
-      const entrada = req.body.entrada?.[0];
+      const entrada = req.body.entrada?.[0] || req.body.entry?.[0];
       if (!entrada) {
         console.log('❌ No se encontró entrada en el webhook');
         return res.sendStatus(200);
       }
 
-      const cambio = entrada.cambios?.[0];
+      const cambio = entrada.cambios?.[0] || entrada.changes?.[0];
       if (!cambio) {
         console.log('❌ No se encontró cambio en el webhook');
         return res.sendStatus(200);
       }
 
-      const valor = cambio.valor;
+      const valor = cambio.valor || cambio.value;
       if (!valor) {
         console.log('❌ No se encontró valor en el webhook');
         return res.sendStatus(200);
@@ -27,10 +27,10 @@ class WebhookController {
 
       console.log('🔍 Procesando valor:', JSON.stringify(valor, null, 2));
 
-      // Extraer mensaje y contacto
-      const mensaje = valor.mensajes?.[0];
-      const contacto = valor.contactos?.[0];
-      const estados = valor.estados?.[0];
+      // Extraer mensaje y contacto (manejando nombres en español e inglés)
+      const mensaje = valor.mensajes?.[0] || valor.messages?.[0];
+      const contacto = valor.contactos?.[0] || valor.contacts?.[0];
+      const estados = valor.estados?.[0] || valor.statuses?.[0];
 
       if (estados) {
         console.log('📊 Estado del mensaje:', JSON.stringify(estados, null, 2));
@@ -42,25 +42,27 @@ class WebhookController {
         return res.sendStatus(200);
       }
 
-      // Adaptar el formato del mensaje al esperado por el handler
+      // Adaptar el formato del mensaje
       const adaptedMessage = {
-        from: mensaje.de,
+        from: mensaje.de || mensaje.from,
         id: mensaje.id,
-        timestamp: mensaje.marca_de_tiempo,
-        type: mensaje.tipo,
-        text: mensaje.texto ? { body: mensaje.texto.cuerpo } : undefined,
-        interactive: mensaje.interactivo ? {
-          type: mensaje.interactivo.tipo,
-          button_reply: mensaje.interactivo.respuesta_boton ? {
-            id: mensaje.interactivo.respuesta_boton.id,
-            title: mensaje.interactivo.respuesta_boton.titulo
+        timestamp: mensaje.marca_de_tiempo || mensaje.timestamp,
+        type: mensaje.tipo || mensaje.type,
+        text: mensaje.texto ? { 
+          body: mensaje.texto.cuerpo || mensaje.texto.body 
+        } : undefined,
+        interactive: mensaje.interactivo || mensaje.interactive ? {
+          type: (mensaje.interactivo || mensaje.interactive).tipo || (mensaje.interactivo || mensaje.interactive).type,
+          button_reply: (mensaje.interactivo || mensaje.interactive).respuesta_boton || (mensaje.interactivo || mensaje.interactive).button_reply ? {
+            id: ((mensaje.interactivo || mensaje.interactive).respuesta_boton || (mensaje.interactivo || mensaje.interactive).button_reply).id,
+            title: ((mensaje.interactivo || mensaje.interactive).respuesta_boton || (mensaje.interactivo || mensaje.interactive).button_reply).titulo || ((mensaje.interactivo || mensaje.interactive).respuesta_boton || (mensaje.interactivo || mensaje.interactive).button_reply).title
           } : undefined
         } : undefined
       };
 
       const adaptedSenderInfo = contacto ? {
         profile: {
-          name: contacto.perfil?.nombre
+          name: contacto.perfil?.nombre || contacto.profile?.name
         },
         wa_id: contacto.wa_id
       } : undefined;
