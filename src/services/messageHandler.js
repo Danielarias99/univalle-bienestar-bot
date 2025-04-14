@@ -97,8 +97,11 @@ class MessageHandler {
       switch(option) {
         case 'otra_consulta':
           if (this.consultaCounter[from] < 3) {
-            this.appointmentState[from] = { step: "esperando_pregunta_ia" };
-            await whatsappService.sendMessage(from, "🧠 Estoy listo para responder tu consulta. ¡Escribe tu pregunta!");
+            // Limpiar el estado anterior
+            delete this.appointmentState[from];
+            // Enviar el menú de bienvenida nuevamente
+            await this.sendWelcomeMessage(from, message.id, senderInfo);
+            await this.sendWelcomeMenu(from);
           } else {
             await whatsappService.sendMessage(from, "Has alcanzado el límite de 3 consultas por día. ¡Vuelve mañana! 😊");
             this.finalizedUsers[from] = true;
