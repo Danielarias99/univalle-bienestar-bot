@@ -97,11 +97,16 @@ class MessageHandler {
       switch(option) {
         case 'otra_consulta':
           if (this.consultaCounter[from] < 3) {
-            // Limpiar el estado anterior
-            delete this.appointmentState[from];
-            // Enviar el menú de bienvenida nuevamente
-            await this.sendWelcomeMessage(from, message.id, senderInfo);
-            await this.sendWelcomeMenu(from);
+            // Si estamos en el estado de consultas_lista, volvemos al menú principal
+            if (this.appointmentState[from]?.step === "consultas_lista") {
+              delete this.appointmentState[from];
+              await this.sendWelcomeMessage(from, message.id, senderInfo);
+              await this.sendWelcomeMenu(from);
+            } else {
+              // Para otros estados, mostramos el menú de consultas
+              this.appointmentState[from] = { step: "consultas_lista" };
+              await whatsappService.sendMessage(from, `📋 *Opciones de consulta:*\n\n1. Precios 💰\n2. Horarios 🕒\n3. Ubicación y contacto 📍\n4. Consultar mensualidad 🧾\n5. Pausar membresía ⏸️\n6. Contactar asesor 🤝`);
+            }
           } else {
             await whatsappService.sendMessage(from, "Has alcanzado el límite de 3 consultas por día. ¡Vuelve mañana! 😊");
             this.finalizedUsers[from] = true;
@@ -125,6 +130,17 @@ class MessageHandler {
         case 'opcion_3':
           this.appointmentState[from] = { step: "esperando_pregunta_ia" };
           await whatsappService.sendMessage(from, "🧠 Estoy listo para responder tu consulta. ¡Escribe tu pregunta!");
+          break;
+
+        case 'consulta_otra':
+          if (this.consultaCounter[from] < 3) {
+            this.appointmentState[from] = { step: "consultas_lista" };
+            await whatsappService.sendMessage(from, `📋 *Opciones de consulta:*\n\n1. Precios 💰\n2. Horarios 🕒\n3. Ubicación y contacto 📍\n4. Consultar mensualidad 🧾\n5. Pausar membresía ⏸️\n6. Contactar asesor 🤝`);
+          } else {
+            await whatsappService.sendMessage(from, "Has alcanzado el límite de 3 consultas por día. ¡Vuelve mañana! 😊");
+            this.finalizedUsers[from] = true;
+            delete this.appointmentState[from];
+          }
           break;
 
         default:
@@ -547,33 +563,45 @@ case 'awaitingDayInput':
 
 
           case "consultas_lista":
-  const option = message.trim().toLowerCase();
-  const normalized = option.replace(/[^a-z0-9áéíóúñü]/gi, '').toLowerCase();
+            const option = message.trim().toLowerCase();
+            const normalized = option.replace(/[^a-z0-9áéíóúñü]/gi, '').toLowerCase();
 
-  if (["1", "precios", "membresia", "membresías"].includes(normalized)) {
-    response = `💰 *Precios y membresías:*\n\n- Mensual: $60.000 COP\n- Quincenal: $35.000 COP\n- Día: $10.000 COP\n\nIncluye acceso completo a todas las zonas del gimnasio, y orientación de los entrenadores.`;
-  } else if (["2", "horarios", "horario"].includes(normalized)) {
-    response = `🕒 *Horarios del Gym:*\n\nLunes a Viernes: 5:00am - 9:00pm\nSábados: 6:00am - 12:00m\nDomingos y festivos: Cerrado.`;
-  } else if (["3", "ubicacion", "ubicación", "contacto", "direccion", "dirección"].includes(normalized)) {
-    response = `📍 *Ubicación y contacto:*\n\n📌 Dirección: Calle 123 #45-67, Zarzal\n📞 Tel: +57 3116561249\n📧 Email: @gymbro@gmail.com\n🕘 Atención: Lun-Sáb en el horario establecido`;
-  } else if (["5", "pausar", "pausar membresia"].includes(normalized)) {
-    state.step = "pausar_nombre";
-    await whatsappService.sendMessage(to, `📝 Para solicitar una pausa de tu membresía, primero necesito algunos datos.\n\nPor favor, escribe tu nombre y apellido:`);
-    return;
-  } else if (["6", "asesor", "hablar asesor"].includes(normalized)) {
-    response = `📲 Un asesor se pondrá en contacto contigo pronto. ¡Gracias por escribirnos! 💬`;
-  } else {
-    response = `❓ Opción no válida. Por favor escribe el número o nombre de la consulta:\n\n1. Precios 💰\n2. Horarios 🕒\n3. Ubicación y contacto 📍\n4. Consultar mensualidad 🧾\n5. Pausar membresía ⏸️\n6. Contactar asesor 🤝`;
-  }
-
-  await whatsappService.sendMessage(to, response);
-  if (!["pausar_nombre", "esperando_cedula_consulta"].includes(state.step)) {
-    await this.sendInteractiveButtons(to, "¿Deseas realizar otra consulta o finalizar?", [
-      { type: "reply", reply: { id: "consulta_otra", title: "🔁 Otra consulta" } },
-      { type: "reply", reply: { id: "consulta_finalizar", title: "❌ Finalizar" } }
-    ]);
-  }
-  return;
+            if (["1", "precios", "membresia", "membresías"].includes(normalized)) {
+              response = `💰 *Precios y membresías:*\n\n- Mensual: $60.000 COP\n- Quincenal: $35.000 COP\n- Día: $10.000 COP\n\nIncluye acceso completo a todas las zonas del gimnasio, y orientación de los entrenadores.`;
+              await whatsappService.sendMessage(to, response);
+              await this.sendInteractiveButtons(to, "¿Deseas realizar otra consulta o finalizar?", [
+                { type: "reply", reply: { id: "consulta_otra", title: "🔁 Otra consulta" } },
+                { type: "reply", reply: { id: "consulta_finalizar", title: "❌ Finalizar" } }
+              ]);
+            } else if (["2", "horarios", "horario"].includes(normalized)) {
+              response = `🕒 *Horarios del Gym:*\n\nLunes a Viernes: 5:00am - 9:00pm\nSábados: 6:00am - 12:00m\nDomingos y festivos: Cerrado.`;
+              await whatsappService.sendMessage(to, response);
+              await this.sendInteractiveButtons(to, "¿Deseas realizar otra consulta o finalizar?", [
+                { type: "reply", reply: { id: "consulta_otra", title: "🔁 Otra consulta" } },
+                { type: "reply", reply: { id: "consulta_finalizar", title: "❌ Finalizar" } }
+              ]);
+            } else if (["3", "ubicacion", "ubicación", "contacto", "direccion", "dirección"].includes(normalized)) {
+              response = `📍 *Ubicación y contacto:*\n\n📌 Dirección: Calle 123 #45-67, Zarzal\n📞 Tel: +57 3116561249\n📧 Email: @gymbro@gmail.com\n🕘 Atención: Lun-Sáb en el horario establecido`;
+              await whatsappService.sendMessage(to, response);
+              await this.sendInteractiveButtons(to, "¿Deseas realizar otra consulta o finalizar?", [
+                { type: "reply", reply: { id: "consulta_otra", title: "🔁 Otra consulta" } },
+                { type: "reply", reply: { id: "consulta_finalizar", title: "❌ Finalizar" } }
+              ]);
+            } else if (["5", "pausar", "pausar membresia"].includes(normalized)) {
+              state.step = "pausar_nombre";
+              await whatsappService.sendMessage(to, `📝 Para solicitar una pausa de tu membresía, primero necesito algunos datos.\n\nPor favor, escribe tu nombre y apellido:`);
+            } else if (["6", "asesor", "hablar asesor"].includes(normalized)) {
+              response = `📲 Un asesor se pondrá en contacto contigo pronto. ¡Gracias por escribirnos! 💬`;
+              await whatsappService.sendMessage(to, response);
+              await this.sendInteractiveButtons(to, "¿Deseas realizar otra consulta o finalizar?", [
+                { type: "reply", reply: { id: "consulta_otra", title: "🔁 Otra consulta" } },
+                { type: "reply", reply: { id: "consulta_finalizar", title: "❌ Finalizar" } }
+              ]);
+            } else {
+              response = `❓ Opción no válida. Por favor escribe el número o nombre de la consulta:\n\n1. Precios 💰\n2. Horarios 🕒\n3. Ubicación y contacto 📍\n4. Consultar mensualidad 🧾\n5. Pausar membresía ⏸️\n6. Contactar asesor 🤝`;
+              await whatsappService.sendMessage(to, response);
+            }
+            return;
 
 case "pausar_nombre":
     const nombreCompleto = message.trim();
