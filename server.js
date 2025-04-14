@@ -14,6 +14,9 @@ import webhookController from './src/controllers/webhookController.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+// Verificar la variable de entorno al inicio
+console.log('VERIFICANDO ENV:', { GOOGLE_CREDENTIALS_BASE64_DEFINED: !!process.env.GOOGLE_CREDENTIALS_BASE64 });
+
 const app = express();
 app.use(express.json());
 
