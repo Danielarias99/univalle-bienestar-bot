@@ -6,20 +6,30 @@ class WebhookController {
     try {
       console.log('📥 Webhook recibido:', JSON.stringify(req.body, null, 2));
 
+      // Verificar si el objeto está en español o inglés
+      if (!req.body.objeto && !req.body.object) {
+        console.log('❌ No se encontró objeto en el webhook');
+        return res.sendStatus(200);
+      }
+
       // Adaptación para manejar campos en español
-      const entrada = req.body.entrada?.[0] || req.body.entry?.[0];
-      if (!entrada) {
+      const entrada = req.body.entrada || req.body.entry;
+      if (!entrada || !Array.isArray(entrada) || entrada.length === 0) {
         console.log('❌ No se encontró entrada en el webhook');
         return res.sendStatus(200);
       }
 
-      const cambio = entrada.cambios?.[0] || entrada.changes?.[0];
-      if (!cambio) {
-        console.log('❌ No se encontró cambio en el webhook');
+      const primerEntrada = entrada[0];
+      const cambios = primerEntrada.cambios || primerEntrada.changes;
+      
+      if (!cambios || !Array.isArray(cambios) || cambios.length === 0) {
+        console.log('❌ No se encontró cambios en el webhook');
         return res.sendStatus(200);
       }
 
-      const valor = cambio.valor || cambio.value;
+      const primerCambio = cambios[0];
+      const valor = primerCambio.valor || primerCambio.value;
+
       if (!valor) {
         console.log('❌ No se encontró valor en el webhook');
         return res.sendStatus(200);
@@ -28,25 +38,28 @@ class WebhookController {
       console.log('🔍 Procesando valor:', JSON.stringify(valor, null, 2));
 
       // Extraer mensaje y contacto (manejando nombres en español e inglés)
-      const mensaje = valor.mensajes?.[0] || valor.messages?.[0];
-      const contacto = valor.contactos?.[0] || valor.contacts?.[0];
-      const estados = valor.estados?.[0] || valor.statuses?.[0];
+      const mensajes = valor.mensajes || valor.messages;
+      const contactos = valor.contactos || valor.contacts;
+      const estados = valor.estados || valor.statuses;
 
-      if (estados) {
-        console.log('📊 Estado del mensaje:', JSON.stringify(estados, null, 2));
+      if (estados && estados[0]) {
+        console.log('📊 Estado del mensaje:', JSON.stringify(estados[0], null, 2));
         return res.sendStatus(200);
       }
 
-      if (!mensaje) {
-        console.log('❌ No se encontró mensaje en el webhook');
+      if (!mensajes || !Array.isArray(mensajes) || mensajes.length === 0) {
+        console.log('❌ No se encontró mensajes en el webhook');
         return res.sendStatus(200);
       }
+
+      const mensaje = mensajes[0];
+      const contacto = contactos && contactos[0];
 
       // Adaptar el formato del mensaje
       const adaptedMessage = {
         from: mensaje.de || mensaje.from,
         id: mensaje.id,
-        timestamp: mensaje.marca_de_tiempo || mensaje.timestamp,
+        timestamp: mensaje["marca de tiempo"] || mensaje.timestamp,
         type: mensaje.tipo || mensaje.type,
         text: mensaje.texto ? { 
           body: mensaje.texto.cuerpo || mensaje.texto.body 
