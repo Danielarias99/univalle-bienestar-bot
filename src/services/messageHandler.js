@@ -231,46 +231,86 @@ else timeGreeting = "¡Buenas noches!";
     const state = this.appointmentState[to];
     let response;
 
+    console.log(`🔄 Handling state: ${state?.step} for user ${to} with message: ${message}`); // Log inicial
+
     // 👇 Manejo de los botones "Otra consulta" y "Finalizar"
-if (message === "consulta_otra") {
-  state.step = "consultas_lista";
-  const response = `📋 Estas son las opciones disponibles:\n\n1. Precios 💰\n2. Horarios  🧾\n3. Ubicación y contacto 📍🕒\n4.Consultar mi estado de mensualidad \n5.Pausar membresía ⏸️ \n6. Hablar con un asesor 🤝`;
-  await whatsappService.sendMessage(to, response);
-  return;
-}
-
-if (message === "consulta_finalizar") {
-  delete this.appointmentState[to];
-  const response = `✅ Consulta finalizada. ¡Gracias por comunicarte con *GymBro*! Si deseas volver a consultar, escribe *Hola* 💬.`;
-  await whatsappService.sendMessage(to, response);
-  return;
-}
-
-// 💬 Manejo de la consulta abierta con Gemini
-if (state.step === "esperando_pregunta_ia") {
-  await whatsappService.sendMessage(to, "🤖 Pensando... un momento por favor.");
-  const respuestaIA = await preguntarAGemini(message);
-  
-  // Dividir respuesta si es muy larga
-  const MAX_LENGTH = 4000;
-  if (respuestaIA.length > MAX_LENGTH) {
-    const chunks = respuestaIA.match(new RegExp(`.{1,${MAX_LENGTH}}`, 'g')) || [];
-    for (const chunk of chunks) {
-      await whatsappService.sendMessage(to, chunk);
+    if (message === "consulta_otra") {
+      state.step = "consultas_lista";
+      const response = `📋 Estas son las opciones disponibles:\n\n1. Precios 💰\n2. Horarios  🧾\n3. Ubicación y contacto 📍🕒\n4.Consultar mi estado de mensualidad \n5.Pausar membresía ⏸️ \n6. Hablar con un asesor 🤝`;
+      await whatsappService.sendMessage(to, response);
+      return;
     }
-  } else {
-    await whatsappService.sendMessage(to, respuestaIA);
-  }
 
-  // Mantener el estado para seguir en modo IA
-  state.step = "esperando_pregunta_ia";
-  
-  // Solo mostrar botón de finalizar con mensaje más preciso
-  await this.sendInteractiveButtons(to, "Si has terminado, puedes finalizar la consulta:", [
-    { type: "reply", reply: { id: "finalizar_chat", title: "❌ Finalizar consulta" } }
-  ]);
-  return;
-}
+    if (message === "consulta_finalizar") {
+      delete this.appointmentState[to];
+      const response = `✅ Consulta finalizada. ¡Gracias por comunicarte con *GymBro*! Si deseas volver a consultar, escribe *Hola* 💬.`;
+      await whatsappService.sendMessage(to, response);
+      return;
+    }
+
+    // 💬 Manejo de la consulta abierta con Gemini
+    if (state.step === "esperando_pregunta_ia") {
+      await whatsappService.sendMessage(to, "🤖 Pensando... un momento por favor.");
+      const respuestaIA = await preguntarAGemini(message);
+      
+      // Dividir respuesta si es muy larga
+      const MAX_LENGTH = 4000;
+      if (respuestaIA.length > MAX_LENGTH) {
+        const chunks = respuestaIA.match(new RegExp(`.{1,${MAX_LENGTH}}`, 'g')) || [];
+        for (const chunk of chunks) {
+          await whatsappService.sendMessage(to, chunk);
+        }
+      } else {
+        await whatsappService.sendMessage(to, respuestaIA);
+      }
+
+      // Mantener el estado para seguir en modo IA
+      state.step = "esperando_pregunta_ia";
+      
+      // Solo mostrar botón de finalizar con mensaje más preciso
+      await this.sendInteractiveButtons(to, "Si has terminado, puedes finalizar la consulta:", [
+        { type: "reply", reply: { id: "finalizar_chat", title: "❌ Finalizar consulta" } }
+      ]);
+      return;
+    }
+
+    // 🧾 Manejo específico para esperar la cédula
+    if (state.step === "esperando_cedula") {
+      const cedula = message.trim();
+      console.log(`🆔 Cédula recibida: ${cedula} para usuario ${to}`);
+      if (!/^\d{6,10}$/.test(cedula)) {
+        await whatsappService.sendMessage(to, "⚠️ Por favor ingresa un número de cédula válido (entre 6 y 10 dígitos).");
+        return; // Mantenemos el estado esperando_cedula
+      }
+
+      try {
+        console.log(`🔍 Llamando a consultarMembresia con cédula: ${cedula}`);
+        await whatsappService.sendMessage(to, "Consultando tu membresía... ⏳"); // Mensaje de espera
+        const resultadoConsulta = await consultarMembresia(cedula);
+        console.log(`📊 Resultado de consultarMembresia:`, resultadoConsulta);
+
+        if (resultadoConsulta && resultadoConsulta.mensaje) {
+          console.log(`💬 Enviando respuesta de membresía a ${to}`);
+          await whatsappService.sendMessage(to, resultadoConsulta.mensaje);
+        } else {
+          console.error(`❌ Error: consultarMembresia no devolvió un mensaje válido para ${cedula}`);
+          await whatsappService.sendMessage(to, "❌ Hubo un problema al consultar tu membresía. Intenta más tarde.");
+        }
+
+        // Después de consultar, volvemos a ofrecer opciones
+        delete state.step; // Limpiar el estado de esperar cédula
+        await this.sendInteractiveButtons(to, "¿Deseas realizar otra consulta o finalizar?", [
+            { type: "reply", reply: { id: "consulta_otra", title: "🔁 Otra consulta" } },
+            { type: "reply", reply: { id: "consulta_finalizar", title: "❌ Finalizar" } },
+        ]);
+
+      } catch (error) {
+        console.error(`❌ Error al llamar o procesar consultarMembresia para ${cedula}:`, error);
+        await whatsappService.sendMessage(to, "❌ Ocurrió un error grave al consultar tu membresía. Por favor, contacta a un asesor.");
+        delete state.step; // Limpiar estado incluso si hay error
+      }
+      return; // Importante: Terminar aquí después de manejar la cédula
+    }
 
   
     switch (state.step) {
@@ -501,36 +541,37 @@ case 'awaitingDayInput':
 
 
           case "consultas_lista":
-  const option = message.trim().toLowerCase();
-  const normalized = option.replace(/[^a-z0-9áéíóúñü]/gi, '').toLowerCase();
+            const option = message.trim().toLowerCase();
+            const normalized = option.replace(/[^a-z0-9áéíóúñü]/gi, '').toLowerCase();
 
-  if (["1", "precios", "membresia", "membresías"].includes(normalized)) {
-    response = `💰 *Precios y membresías:*\n\n- Mensual: $60.000 COP\n- Quincenal: $35.000 COP\n- Día: $10.000 COP\n\nIncluye acceso completo a todas las zonas del gimnasio, y orientación de los entrenadores.`;
-  } else if (["2", "horarios", "horario"].includes(normalized)) {
-    response = `🕒 *Horarios del Gym:*\n\nLunes a Viernes: 5:00am - 9:00pm\nSábados: 6:00am - 12:00m\nDomingos y festivos: Cerrado.`;
-  } else if (["3", "ubicacion", "ubicación", "contacto", "direccion", "dirección"].includes(normalized)) {
-    response = `📍 *Ubicación y contacto:*\n\n📌 Dirección: Calle 123 #45-67, Zarzal\n📞 Tel: +57 3116561249\n📧 Email: @gymbro@gmail.com\n🕘 Atención: Lun-Sáb en el horario establecido`;
-  } else if (["4", "estado", "miestado", "estado membresia"].includes(normalized)) {
-    response = `🧾 Para consultar tu estado de membresía, por favor responde con tu número de cédula.`;
-    state.step = "esperando_cedula";
-    return await whatsappService.sendMessage(to, response);
-  } else if (["5", "pausar", "pausar membresia", "pausarmembresia"].includes(normalized)) {
-    response = `📝 Para solicitar una pausa de tu membresía, primero necesito algunos datos.\n\nPor favor, escribe tu nombre y apellido:`;
-    state.step = "pausar_nombre";
-    return await whatsappService.sendMessage(to, response);
-  } else if (["6", "asesor", "hablar asesor", "ayuda", "asesoria"].includes(normalized)) {
-    response = `📲 Un asesor se pondrá en contacto contigo pronto. ¡Gracias por escribirnos! 💬`;
-  } else {
-    response = `❓ Opción no válida. Por favor escribe el número o nombre de la consulta:\n\n1. Precios 💰\n2. Horarios 🕒\n3. Ubicación y contacto 📍\n4. Consultar mensualidad 🧾\n5. Pausar membresía ⏸️\n6. Contactar asesor 🤝`;
-  }
+            if (["1", "precios", "membresia", "membresías"].includes(normalized)) {
+              response = `💰 *Precios y membresías:*\n\n- Mensual: $60.000 COP\n- Quincenal: $35.000 COP\n- Día: $10.000 COP\n\nIncluye acceso completo a todas las zonas del gimnasio, y orientación de los entrenadores.`;
+            } else if (["2", "horarios", "horario"].includes(normalized)) {
+              response = `🕒 *Horarios del Gym:*\n\nLunes a Viernes: 5:00am - 9:00pm\nSábados: 6:00am - 12:00m\nDomingos y festivos: Cerrado.`;
+            } else if (["3", "ubicacion", "ubicación", "contacto", "direccion", "dirección"].includes(normalized)) {
+              response = `📍 *Ubicación y contacto:*\n\n📌 Dirección: Calle 123 #45-67, Zarzal\n📞 Tel: +57 3116561249\n📧 Email: @gymbro@gmail.com\n🕘 Atención: Lun-Sáb en el horario establecido`;
+            } else if (["4", "estado", "miestado", "estado membresia", "consultar mensualidad"].includes(normalized)) { // Añadido "consultar mensualidad"
+              response = `🧾 Para consultar tu estado de membresía, por favor responde con tu número de cédula.`;
+              state.step = "esperando_cedula";
+              console.log(`⏳ Cambiando estado a 'esperando_cedula' para ${to}`);
+              return await whatsappService.sendMessage(to, response);
+            } else if (["5", "pausar", "pausar membresia", "pausarmembresia"].includes(normalized)) {
+              response = `📝 Para solicitar una pausa de tu membresía, primero necesito algunos datos.\n\nPor favor, escribe tu nombre y apellido:`;
+              state.step = "pausar_nombre";
+              return await whatsappService.sendMessage(to, response);
+            } else if (["6", "asesor", "hablar asesor", "ayuda", "asesoria"].includes(normalized)) {
+              response = `📲 Un asesor se pondrá en contacto contigo pronto. ¡Gracias por escribirnos! 💬`;
+            } else {
+              response = `❓ Opción no válida. Por favor escribe el número o nombre de la consulta:\n\n1. Precios 💰\n2. Horarios 🕒\n3. Ubicación y contacto 📍\n4. Consultar mensualidad 🧾\n5. Pausar membresía ⏸️\n6. Contactar asesor 🤝`;
+            }
 
-  // 👉 Solo se llega aquí si no cambia a otro paso
-  await whatsappService.sendMessage(to, response);
-  await this.sendInteractiveButtons(to, "¿Deseas realizar otra consulta o finalizar?", [
-    { type: "reply", reply: { id: "consulta_otra", title: "🔁 Otra consulta" } },
-    { type: "reply", reply: { id: "consulta_finalizar", title: "❌ Finalizar" } },
-  ]);
-  return;
+            // 👉 Solo se llega aquí si no cambia a otro paso
+            await whatsappService.sendMessage(to, response);
+            await this.sendInteractiveButtons(to, "¿Deseas realizar otra consulta o finalizar?", [
+              { type: "reply", reply: { id: "consulta_otra", title: "🔁 Otra consulta" } },
+              { type: "reply", reply: { id: "consulta_finalizar", title: "❌ Finalizar" } },
+            ]);
+            return;
 
 case "pausar_nombre":
     const nombreCompleto = message.trim();

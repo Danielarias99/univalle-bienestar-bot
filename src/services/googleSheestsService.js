@@ -111,59 +111,85 @@ const appendPauseToSheet = async (data) => {
 
 // 🔍 Consultar estado de membresía
 async function consultarMembresia(cedula) {
+    console.log(`[consultarMembresia] Iniciando consulta para cédula: ${cedula}`); // Log inicio
     if (!authClient) {
-        console.log('🔄 Reintentando autenticación de Google Sheets...');
+        console.log('[consultarMembresia] 🔄 Reintentando autenticación de Google Sheets...');
         try {
             authClient = await getAuthClient();
         } catch (error) {
-            console.error('❌ Falló la re-autenticación.');
+            console.error('[consultarMembresia] ❌ Falló la re-autenticación.');
+            // Devolver un objeto de error consistente
             return { encontrado: false, mensaje: "Error interno al conectar con Google Sheets." };
         }
     }
     try {
-        console.log(`🔍 Consultando membresía para cédula: ${cedula}...`);
+        console.log(`[consultarMembresia] 🔍 Consultando Spreadsheet ID: ${spreadsheetId}, Range: Base de Datos`);
         const spreadsheetId = "1sNHbR0y52mlRE3z5E8JTaOMktUro3fPm6ZZPxXIUVZY";
         const response = await sheets.spreadsheets.values.get({
             spreadsheetId,
-            range: "Base de Datos",
+            range: "Base de Datos", // Asegúrate que este nombre sea EXACTO al de tu hoja
             auth: authClient,
         });
-        console.log('✅ Consulta a Base de Datos exitosa.');
+        console.log('[consultarMembresia] ✅ Consulta a API de Google Sheets exitosa.');
         const rows = response.data.values || [];
-        const userRows = rows.filter(row => row && row[1] === cedula);
+        console.log(`[consultarMembresia] ${rows.length} filas obtenidas de 'Base de Datos'.`);
+
+        // Filtrar filas de forma segura
+        const userRows = rows.filter(row => row && typeof row[1] === 'string' && row[1].trim() === cedula.trim());
+        console.log(`[consultarMembresia] ${userRows.length} filas encontradas para la cédula ${cedula}.`);
 
         if (userRows.length === 0) {
+            console.log(`[consultarMembresia] ❌ Cédula ${cedula} no encontrada.`);
             return { encontrado: false, mensaje: "❌ No se encontró ninguna membresía asociada a esta cédula." };
         }
-        // ... (resto de la lógica de consultarMembresia) ...
-         const lastRow = userRows[userRows.length - 1];
-         const [telefono, cedulaUser, nombre, tiempoPago, fechaInicio, fechaFin, estado] = lastRow;
-         const hoy = new Date();
-         const finMembresia = new Date(fechaFin);
-         const diferenciaDias = Math.ceil((finMembresia - hoy) / (1000 * 60 * 60 * 24));
-         let estadoActual = estado ? estado.toLowerCase() : 'desconocido'; // Manejar estado undefined
-         if (diferenciaDias <= 0 && estadoActual === 'activo') {
-             estadoActual = 'vencido';
-         }
 
-         let mensaje = `👤 *Membresía de ${nombre}*\n\n`;
-         if (estadoActual === 'activo') {
-             mensaje += `✅ Estado: Activo\n📅 Fecha inicio: ${fechaInicio}\n📅 Fecha fin: ${fechaFin}\n⏳ Días restantes: ${diferenciaDias}\n💰 Plan: ${tiempoPago}`;
-         } else if (estadoActual === 'vencido') {
-             mensaje += `❌ Estado: Vencido\n📅 Última membresía finalizó: ${fechaFin}\n💭 ¡Renueva tu membresía para seguir entrenando!`;
-         } else {
-             mensaje += `⚠️ Estado: ${estado || 'No definido'}\n📅 Última actualización: ${fechaFin || 'N/A'}`;
-         }
+        const lastRow = userRows[userRows.length - 1];
+        console.log(`[consultarMembresia] Última fila encontrada:`, lastRow);
+        // Asegurarse de que los índices son correctos para tu hoja 'Base de Datos'
+        // [telefono, cedula, nombre, tiempo, fechaInicio, fechaFin, estado]
+        const [telefono, cedulaUser, nombre, tiempoPago, fechaInicio, fechaFin, estado] = lastRow;
 
-         return {
-             encontrado: true,
-             mensaje,
-             datos: { nombre, estado: estadoActual, diasRestantes: diferenciaDias, fechaFin, tiempoPago }
-         };
+        console.log(`[consultarMembresia] Procesando datos: Nombre=${nombre}, Estado=${estado}, FechaFin=${fechaFin}`);
+
+        const hoy = new Date();
+        // Validar fechaFin antes de crear el objeto Date
+        let finMembresia;
+        try {
+            finMembresia = new Date(fechaFin);
+            if (isNaN(finMembresia.getTime())) {
+                throw new Error('Fecha de fin inválida');
+            }
+        } catch (dateError) {
+            console.error(`[consultarMembresia] ⚠️ Error al parsear fechaFin '${fechaFin}':`, dateError);
+            return { encontrado: true, mensaje: `⚠️ Se encontró tu registro (${nombre}), pero hay un problema con la fecha de finalización (${fechaFin}). Contacta a un asesor.` };
+        }
+
+        const diferenciaDias = Math.ceil((finMembresia - hoy) / (1000 * 60 * 60 * 24));
+        let estadoActual = estado ? estado.toLowerCase().trim() : 'desconocido';
+        if (diferenciaDias <= 0 && estadoActual === 'activo') {
+            estadoActual = 'vencido';
+        }
+        console.log(`[consultarMembresia] Estado calculado: ${estadoActual}, Días restantes: ${diferenciaDias}`);
+
+        let mensaje = `👤 *Membresía de ${nombre}*\n\n`;
+        if (estadoActual === 'activo') {
+            mensaje += `✅ Estado: Activo\n📅 Fecha inicio: ${fechaInicio}\n📅 Fecha fin: ${fechaFin}\n⏳ Días restantes: ${diferenciaDias}\n💰 Plan: ${tiempoPago}`;
+        } else if (estadoActual === 'vencido') {
+            mensaje += `❌ Estado: Vencido\n📅 Última membresía finalizó: ${fechaFin}\n💭 ¡Renueva tu membresía para seguir entrenando!`;
+        } else {
+            mensaje += `⚠️ Estado: ${estado || 'No definido'}\n📅 Última actualización: ${fechaFin || 'N/A'}`;
+        }
+
+        console.log(`[consultarMembresia] Mensaje final construido.`);
+        return {
+            encontrado: true,
+            mensaje,
+            datos: { nombre, estado: estadoActual, diasRestantes: diferenciaDias, fechaFin, tiempoPago }
+        };
 
     } catch (error) {
-        console.error(`❌ Error al consultar membresía para ${cedula}:`, error);
-        return { encontrado: false, mensaje: "❌ Ocurrió un error al consultar la membresía. Intenta más tarde." };
+        console.error(`[consultarMembresia] ❌ Error durante la consulta para ${cedula}:`, error.response?.data || error.message, error.stack);
+        return { encontrado: false, mensaje: "❌ Ocurrió un error al consultar la base de datos de membresías. Intenta más tarde." };
     }
 }
 
