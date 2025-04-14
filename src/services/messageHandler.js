@@ -52,6 +52,12 @@ class MessageHandler {
 
     // Manejar mensajes de texto
     if (message.type === 'text') {
+      // Verificar que message.text existe antes de acceder a body
+      if (!message.text || !message.text.body) {
+        console.log('❌ Mensaje de texto inválido:', message);
+        return;
+      }
+
       const rawMessage = message.text.body.trim();
       const incomingMessage = rawMessage.toLowerCase();
 
