@@ -455,10 +455,14 @@ case 'awaitingDayInput':
                 );
               }
             } catch (err) {
-              console.error("Error al procesar la cita:", err);
+              console.error("❌ Error al procesar la cita en messageHandler:", err);
+              // Loguear detalles específicos del error de Sheets si existen
+              if (err.response?.data?.error) {
+                console.error("Detalles del error de Google Sheets API:", err.response.data.error);
+              }
               await whatsappService.sendMessage(
                 to,
-                "⚠️ Ocurrió un error al guardar los datos. Intenta nuevamente o contáctanos.",
+                "⚠️ Ocurrió un error al guardar los datos. Por favor, inténtalo de nuevo más tarde o contacta a un asesor.",
                 messageId
               );
             }
