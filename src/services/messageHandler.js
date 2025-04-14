@@ -1,6 +1,6 @@
 import { response } from 'express';
 import whatsappService from './whatsappService.js';
-import { appendToSheet, getAppointments, appendPauseToSheet, consultarMembresia } from './googleSheestsService.js';
+import { appendToSheet, getAppointments, appendPauseToSheet } from './googleSheestsService.js';
 import { preguntarAGemini } from './geminiService.js'; // ✅ Import correcto de Gemini
 
 
@@ -15,10 +15,6 @@ class MessageHandler {
   constructor() {
     this.appointmentState={};
     this.userData = {};
-    this.consultaCounter = {}; // Contador de consultas por usuario
-    this.lastConsultDate = {}; // Fecha de la última consulta
-    this.userQueryCounts = {}; // { "+573001234567": { fecha: "2025-04-12", count: 1 } }
-    this.finalizedUsers = {};
   }
 
   isThanksOrClosure(message) {
@@ -37,119 +33,91 @@ class MessageHandler {
 
   async handleIncomingMessage(message, senderInfo) {
     const from = message.from;
-    console.log('📝 Mensaje entrante:', message);
-
-    if (!message || !message.type) {
-      console.log('❌ Mensaje inválido recibido');
-      return;
-    }
-
+  
     const allowedTypes = ["text", "interactive", "button", "image", "audio", "video", "document"];
     if (!allowedTypes.includes(message.type)) {
       console.log(`👀 Mensaje ignorado: tipo "${message.type}" de ${from}`);
       return;
     }
-
-    // Manejar mensajes de texto
-    if (message?.type === 'text' && message.text?.body) {
+  
+    // Si ya finalizó el chat, ignorar todo salvo que diga "hola"
+    const finalized = this.finalizedUsers?.[from];
+    
+    if (message?.type === 'text') {
       const rawMessage = message.text.body.trim();
       const incomingMessage = rawMessage.toLowerCase();
-
-      console.log('📝 Mensaje recibido:', rawMessage);
-      console.log('🔄 Estado actual:', this.appointmentState[from]);
-
-      // Verificar si es un saludo
-      if (this.isGreeting(incomingMessage)) {
-        console.log('👋 Saludo detectado, enviando mensaje de bienvenida');
-        try {
-          delete this.finalizedUsers[from];
-          delete this.appointmentState[from];
-          
-          // Enviar mensaje de bienvenida y menú
-          await this.sendWelcomeMessage(from, message.id, senderInfo);
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          await this.sendWelcomeMenu(from);
-        } catch (error) {
-          console.error('❌ Error al enviar mensajes de bienvenida:', error);
-        }
+      const stripped = rawMessage.replace(/[\s\u200B-\u200D\uFEFF]/g, '');
+  
+      if (!stripped.length) {
+        console.log(`🕳️ Mensaje ignorado (vacío o sin contenido visible) de ${from}`);
         return;
       }
-
-      // Si el chat está finalizado y no es un saludo, ignorar
-      if (this.finalizedUsers[from] && !this.isGreeting(incomingMessage)) {
-        console.log(`Chat finalizado para ${from}, ignorando mensaje`);
+  
+      if (finalized && !incomingMessage.includes('hola')) {
+        console.log(`👋 Usuario ${from} finalizó el chat. Ignorando: ${rawMessage}`);
         return;
       }
-
-      // Procesar mensaje si hay un flujo activo
-      if (this.appointmentState[from]) {
+  
+      const hasActiveFlow = this.appointmentState[from];
+      const isGreeting = this.isGreeting(incomingMessage);
+  
+      // Solo procesar si:
+      // 1. Es un saludo
+      // 2. O tiene un flujo activo
+      if (!hasActiveFlow && !isGreeting) {
+        console.log(`Mensaje ignorado de ${from} (no hay flujo activo ni es saludo): ${rawMessage}`);
+        return;
+      }
+  
+      if (isGreeting) {
+        delete this.finalizedUsers?.[from]; // 👈 vuelve a permitir mensajes
+        await this.sendWelcomeMessage(from, message.id, senderInfo);
+        await this.sendWelcomeMenu(from);
+      } else if (hasActiveFlow) {
         await this.handleAppointmentFlow(from, rawMessage, message.id);
       }
-
+  
       await whatsappService.markAsRead(message.id);
     }
-
-    // Manejar interacciones con botones
-    else if (message.type === "interactive") {
+  
+    // ✅ Botones interactivos
+    else if (message?.type === "interactive") {
       const option = message?.interactive?.button_reply?.id.toLowerCase().trim();
-      console.log('Opción seleccionada:', option);
 
-      switch(option) {
-        case 'otra_consulta':
-          if (this.consultaCounter[from] < 3) {
-            // Si estamos en el estado de consultas_lista, volvemos al menú principal
-            if (this.appointmentState[from]?.step === "consultas_lista") {
-              delete this.appointmentState[from];
-              await this.sendWelcomeMessage(from, message.id, senderInfo);
-              await this.sendWelcomeMenu(from);
-            } else {
-              // Para otros estados, mostramos el menú de consultas
-              this.appointmentState[from] = { step: "consultas_lista" };
-              await whatsappService.sendMessage(from, `📋 *Opciones de consulta:*\n\n1. Precios 💰\n2. Horarios 🕒\n3. Ubicación y contacto 📍\n4. Consultar mensualidad 🧾\n5. Pausar membresía ⏸️\n6. Contactar asesor 🤝`);
-            }
-          } else {
-            await whatsappService.sendMessage(from, "Has alcanzado el límite de 3 consultas por día. ¡Vuelve mañana! 😊");
-            this.finalizedUsers[from] = true;
-            delete this.appointmentState[from];
-          }
-          break;
+      // Manejo botones especiales
+      if (option === 'finalizar_chat') {
+        this.finalizedUsers = this.finalizedUsers || {};
+        this.finalizedUsers[from] = true;
+        delete this.appointmentState?.[from];
+        await whatsappService.sendMessage(from, '✅ Chat finalizado. Si necesitas algo más, escribe *Hola*.');
+        return;
+      }
 
-        case 'finalizar_chat':
-        case 'consulta_finalizar':
-          this.finalizedUsers[from] = true;
-          delete this.appointmentState[from];
-          await whatsappService.sendMessage(from, '✅ Consulta finalizada. Si necesitas algo más, escribe *Hola* para comenzar de nuevo. ¡Que tengas un excelente día! 💪');
-          break;
+      if (option === 'volver_menu') {
+        delete this.finalizedUsers?.[from];
+        await this.sendWelcomeMessage(from, message.id, senderInfo);
+        await this.sendWelcomeMenu(from);
+        return;
+      }
 
-        case 'volver_menu':
-          delete this.finalizedUsers[from];
-          await this.sendWelcomeMessage(from, message.id, senderInfo);
-          await this.sendWelcomeMenu(from);
-          break;
+      if (option === 'opcion_3') {
+        this.appointmentState[from] = { step: "esperando_pregunta_ia" };
+        await whatsappService.sendMessage(from, "🧠 Estoy listo para responder tu consulta. ¡Escribe tu pregunta!");
+        return;
+      }
 
-        case 'opcion_3':
-          this.appointmentState[from] = { step: "esperando_pregunta_ia" };
-          await whatsappService.sendMessage(from, "🧠 Estoy listo para responder tu consulta. ¡Escribe tu pregunta!");
-          break;
-
-        case 'consulta_otra':
-          if (this.consultaCounter[from] < 3) {
-            this.appointmentState[from] = { step: "consultas_lista" };
-            await whatsappService.sendMessage(from, `📋 *Opciones de consulta:*\n\n1. Precios 💰\n2. Horarios 🕒\n3. Ubicación y contacto 📍\n4. Consultar mensualidad 🧾\n5. Pausar membresía ⏸️\n6. Contactar asesor 🤝`);
-          } else {
-            await whatsappService.sendMessage(from, "Has alcanzado el límite de 3 consultas por día. ¡Vuelve mañana! 😊");
-            this.finalizedUsers[from] = true;
-            delete this.appointmentState[from];
-          }
-          break;
-
-        default:
-          if (this.appointmentState[from]) {
-            await this.handleAppointmentFlow(from, option, message.id);
-          } else if (['opcion_1', 'opcion_2'].includes(option)) {
-            await this.handleMenuOption(from, option);
-          }
-          break;
+      // Si tiene un flujo activo, manejarlo
+      if (this.appointmentState[from]) {
+        await this.handleAppointmentFlow(from, option, message.id);
+      } 
+      // Si es una opción del menú principal, procesarla
+      else if (['opcion_1', 'opcion_2'].includes(option)) {
+        await this.handleMenuOption(from, option);
+      }
+      // Si no es ninguna de las anteriores, ignorar
+      else {
+        console.log(`Botón ignorado de ${from} (no es opción válida): ${option}`);
+        return;
       }
 
       await whatsappService.markAsRead(message.id);
@@ -158,25 +126,11 @@ class MessageHandler {
 
 
   isGreeting(message) {
-    const greetings = [
-      "hola", "hello", "hi", "hol", "ola", 
-      "buenas tardes", "buenos días", "buenas noches",
-      "buenas", "buen dia", "que tal", "saludos",
-      "hola buenos", "hola buenas", "hey", "holis",
-      "hola que tal", "como estas", "como va",
-      "hola necesito ayuda", "hola quisiera consultar"
-    ];
-    
+    const greetings = ["hola", "hello", "hi", "hol", "ola", "buenas tardes", "buenos días", "buenas noches","hola, buenas noches","hola, buenos dias","hola, buenas tardes","buenas",
+    "hola, ¿cómo estás?", "hola, ¿me pueden ayudar?"];
     const normalizedMsg = message.toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "") // Elimina acentos
-      .replace(/[¿?!¡.,-]/g, "") // Elimina signos de puntuación
-      .trim();
-
-    return greetings.some(greeting => 
-      normalizedMsg.includes(greeting) || 
-      normalizedMsg.startsWith(greeting)
-    );
+    .replace(/[¿?!¡.,-]/g, ""); // Elimina signos de puntuación
+    return greetings.some(greeting => normalizedMsg.includes(greeting));
   }
 
 
@@ -188,26 +142,34 @@ class MessageHandler {
     const name = this.getSenderName(senderInfo);
     const now = new Date().getHours();
 
-    let timeGreeting = "¡Hola!"; // Valor por defecto
-    if (now < 12) timeGreeting = "¡Buenos días!";
-    else if (now < 19) timeGreeting = "¡Buenas tardes!";
-    else timeGreeting = "¡Buenas noches!";
 
-    const welcomeMessage = 
-      `${timeGreeting} ${name} 👋\n` + 
-      `¡Bienvenido a *GymBro*! 💪🏋️‍♂️\n` +
-      `Somos tu aliado para alcanzar tus objetivos fitness 🔥\n` +
-      `¿En qué puedo ayudarte hoy? 📌`;
+// 1. Modifica esta parte para el saludo horario (usa tus variables existentes)
+let timeGreeting = "¡Hola"; // Valor por defecto
+if (now < 12) timeGreeting = "¡Buenos días!";
+else if (now < 19) timeGreeting = "¡Buenas tardes!";
+else timeGreeting = "¡Buenas noches!";
+
+
+
+    const welcomeMessage =`Hola,${timeGreeting} ${name} 👋\n` + 
+    `¡Bienvenido a *GymBro*!💪🏋️‍♂️🔥\n` +
+    `Somos tu aliado para alcanzar tus objetivos fitness. 💯\n` +
+    `¿En qué puedo ayudarte hoy?📌\n`;
+   
+
+
+
+
 
     await whatsappService.sendMessage(to, welcomeMessage, messageId);
   }
 
   async sendWelcomeMenu(to) {
-    const menuMessage = "Elige una opción:";
+    const menuMessage = "Elige una opción";
     const buttons = [
       { type: "reply", reply: { id: "opcion_1", title: "Agendar clases" } },
       { type: "reply", reply: { id: "opcion_2", title: "Consultar servicios" } },
-      { type: "reply", reply: { id: "opcion_3", title: "Consulta abierta IA🤖" } }
+      { type: "reply", reply: { id: "opcion_3", title: "Consulta abierta IA🤖 " } },
     ];
   
     await whatsappService.sendInteractiveButtons(to, menuMessage, buttons);
@@ -218,17 +180,19 @@ class MessageHandler {
     let response;
     switch (option) {
       case "opcion_1":
-        this.appointmentState[to] = { step: "name" };
+        this.appointmentState[to]= {step:"name"}
         response = "Por favor, Ingresa tu nombre y apellido";
         break;
-      case "opcion_2":
-        this.appointmentState[to] = { step: "consultas_lista" };
-        response = `📋 *Opciones de consulta:*\n\n1. Precios 💰\n2. Horarios 🕒\n3. Ubicación y contacto 📍\n4. Consultar mensualidad 🧾\n5. Pausar membresía ⏸️\n6. Contactar asesor 🤝`;
-        break;
-      case "opcion_3":
-        this.appointmentState[to] = { step: "esperando_pregunta_ia" };
-        response = "🧠 Estoy listo para responder tu consulta. ¡Escribe tu pregunta!";
-        break;
+        case "opcion_2":
+          this.appointmentState[to] = { step: "consultas_lista" };
+          response = `📋 *Opciones de consulta:*\n\n1. Precios 💰\n2. Horarios 🕒\n3. Ubicación y contacto 📍\n4. Consultar mensualidad 🧾\n5. Pausar membresía ⏸️\n6. Contactar asesor 🤝`;
+          break;
+        
+          case "opcion_3":
+            this.appointmentState[to] = { step: "esperando_pregunta_ia" };
+            response = "🧠 Estoy listo para responder tu consulta. ¡Escribe tu pregunta!";
+            break;
+          
     }
     await whatsappService.sendMessage(to, response);
   }
@@ -267,80 +231,48 @@ class MessageHandler {
     const state = this.appointmentState[to];
     let response;
 
-    // Manejo del botón "Nueva consulta" después de consultar membresía
-    if (message === "nueva_consulta") {
-      state.step = "esperando_cedula_consulta";
-      await whatsappService.sendMessage(to, "🔍 Por favor, ingresa tu número de cédula para consultar el estado de tu membresía:");
-      return;
+    // 👇 Manejo de los botones "Otra consulta" y "Finalizar"
+if (message === "consulta_otra") {
+  state.step = "consultas_lista";
+  const response = `📋 Estas son las opciones disponibles:\n\n1. Precios 💰\n2. Horarios  🧾\n3. Ubicación y contacto 📍🕒\n4.Consultar mi estado de mensualidad \n5.Pausar membresía ⏸️ \n6. Hablar con un asesor 🤝`;
+  await whatsappService.sendMessage(to, response);
+  return;
+}
+
+if (message === "consulta_finalizar") {
+  delete this.appointmentState[to];
+  const response = `✅ Consulta finalizada. ¡Gracias por comunicarte con *GymBro*! Si deseas volver a consultar, escribe *Hola* 💬.`;
+  await whatsappService.sendMessage(to, response);
+  return;
+}
+
+// 💬 Manejo de la consulta abierta con Gemini
+if (state.step === "esperando_pregunta_ia") {
+  await whatsappService.sendMessage(to, "🤖 Pensando... un momento por favor.");
+  const respuestaIA = await preguntarAGemini(message);
+  
+  // Dividir respuesta si es muy larga
+  const MAX_LENGTH = 4000;
+  if (respuestaIA.length > MAX_LENGTH) {
+    const chunks = respuestaIA.match(new RegExp(`.{1,${MAX_LENGTH}}`, 'g')) || [];
+    for (const chunk of chunks) {
+      await whatsappService.sendMessage(to, chunk);
     }
+  } else {
+    await whatsappService.sendMessage(to, respuestaIA);
+  }
 
-    // Manejo de la opción "Consultar mensualidad"
-    if (message === "4" || message.toLowerCase() === "consultar mensualidad") {
-      state.step = "esperando_cedula_consulta";
-      await whatsappService.sendMessage(to, "🔍 Por favor, ingresa tu número de cédula para consultar el estado de tu membresía:");
-      return;
-    }
+  // Mantener el estado para seguir en modo IA
+  state.step = "esperando_pregunta_ia";
+  
+  // Solo mostrar botón de finalizar con mensaje más preciso
+  await this.sendInteractiveButtons(to, "Si has terminado, puedes finalizar la consulta:", [
+    { type: "reply", reply: { id: "finalizar_chat", title: "❌ Finalizar consulta" } }
+  ]);
+  return;
+}
 
-    if (state.step === "esperando_cedula_consulta") {
-      const cedula = message.trim();
-      if (!/^\d{6,10}$/.test(cedula)) {
-        await whatsappService.sendMessage(to, "⚠️ Por favor ingresa un número de cédula válido (entre 6 y 10 dígitos).");
-        return;
-      }
-
-      try {
-        const resultado = await consultarMembresia(cedula);
-        await whatsappService.sendMessage(to, resultado.mensaje);
-        await this.sendInteractiveButtons(to, "¿Qué deseas hacer?", [
-          { type: "reply", reply: { id: "nueva_consulta", title: "🔁 Nueva consulta" } },
-          { type: "reply", reply: { id: "finalizar_chat", title: "❌ Finalizar" } }
-        ]);
-      } catch (error) {
-        console.error("Error al consultar membresía:", error);
-        await whatsappService.sendMessage(to, "❌ Ocurrió un error al consultar la membresía. Por favor, intenta más tarde.");
-      }
-      return;
-    }
-
-    if (state.step === "esperando_pregunta_ia") {
-      try {
-        await whatsappService.sendMessage(to, "🤖 Pensando... un momento por favor.");
-        
-        const respuestaIA = await preguntarAGemini(message);
-        await whatsappService.sendMessage(to, respuestaIA);
-
-        // 👉 Control de consultas a Gemini
-        const today = new Date().toISOString().split("T")[0]; // "YYYY-MM-DD"
-        this.userQueryCounts[to] = this.userQueryCounts[to] || { fecha: today, count: 0 };
-
-        // 🔁 Reiniciar si es un nuevo día
-        if (this.userQueryCounts[to].fecha !== today) {
-          this.userQueryCounts[to] = { fecha: today, count: 0 };
-        }
-
-        this.userQueryCounts[to].count += 1;
-
-        const consultasHechas = this.userQueryCounts[to].count;
-
-        if (consultasHechas >= 3) {
-          await whatsappService.sendMessage(to, "⚠️ Has alcanzado el límite de *3 consultas* por hoy. Vuelve mañana para hacer nuevas preguntas.");
-          await this.sendInteractiveButtons(to, "¿Qué deseas hacer ahora?", [
-            { type: "reply", reply: { id: "finalizar_chat", title: "✅ Finalizar chat" } }
-          ]);
-          delete this.appointmentState[to]; // Opcional: cerrar flujo
-        } else {
-          await this.sendInteractiveButtons(to, "¿Deseas hacer otra consulta o finalizar?", [
-            { type: "reply", reply: { id: "opcion_3", title: "🤖 Otra consulta IA" } },
-            { type: "reply", reply: { id: "finalizar_chat", title: "✅ Finalizar chat" } }
-          ]);
-        }
-      } catch (error) {
-        console.error('Error en consulta IA:', error);
-        await whatsappService.sendMessage(to, "❌ Ocurrió un error al procesar tu consulta. Por favor, intenta nuevamente.");
-      }
-      return;
-    }
-
+  
     switch (state.step) {
       case 'name':
         if (!/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/.test(message)) {
@@ -563,45 +495,36 @@ case 'awaitingDayInput':
 
 
           case "consultas_lista":
-            const option = message.trim().toLowerCase();
-            const normalized = option.replace(/[^a-z0-9áéíóúñü]/gi, '').toLowerCase();
+  const option = message.trim().toLowerCase();
+  const normalized = option.replace(/[^a-z0-9áéíóúñü]/gi, '').toLowerCase();
 
-            if (["1", "precios", "membresia", "membresías"].includes(normalized)) {
-              response = `💰 *Precios y membresías:*\n\n- Mensual: $60.000 COP\n- Quincenal: $35.000 COP\n- Día: $10.000 COP\n\nIncluye acceso completo a todas las zonas del gimnasio, y orientación de los entrenadores.`;
-              await whatsappService.sendMessage(to, response);
-              await this.sendInteractiveButtons(to, "¿Deseas realizar otra consulta o finalizar?", [
-                { type: "reply", reply: { id: "consulta_otra", title: "🔁 Otra consulta" } },
-                { type: "reply", reply: { id: "consulta_finalizar", title: "❌ Finalizar" } }
-              ]);
-            } else if (["2", "horarios", "horario"].includes(normalized)) {
-              response = `🕒 *Horarios del Gym:*\n\nLunes a Viernes: 5:00am - 9:00pm\nSábados: 6:00am - 12:00m\nDomingos y festivos: Cerrado.`;
-              await whatsappService.sendMessage(to, response);
-              await this.sendInteractiveButtons(to, "¿Deseas realizar otra consulta o finalizar?", [
-                { type: "reply", reply: { id: "consulta_otra", title: "🔁 Otra consulta" } },
-                { type: "reply", reply: { id: "consulta_finalizar", title: "❌ Finalizar" } }
-              ]);
-            } else if (["3", "ubicacion", "ubicación", "contacto", "direccion", "dirección"].includes(normalized)) {
-              response = `📍 *Ubicación y contacto:*\n\n📌 Dirección: Calle 123 #45-67, Zarzal\n📞 Tel: +57 3116561249\n📧 Email: @gymbro@gmail.com\n🕘 Atención: Lun-Sáb en el horario establecido`;
-              await whatsappService.sendMessage(to, response);
-              await this.sendInteractiveButtons(to, "¿Deseas realizar otra consulta o finalizar?", [
-                { type: "reply", reply: { id: "consulta_otra", title: "🔁 Otra consulta" } },
-                { type: "reply", reply: { id: "consulta_finalizar", title: "❌ Finalizar" } }
-              ]);
-            } else if (["5", "pausar", "pausar membresia"].includes(normalized)) {
-              state.step = "pausar_nombre";
-              await whatsappService.sendMessage(to, `📝 Para solicitar una pausa de tu membresía, primero necesito algunos datos.\n\nPor favor, escribe tu nombre y apellido:`);
-            } else if (["6", "asesor", "hablar asesor"].includes(normalized)) {
-              response = `📲 Un asesor se pondrá en contacto contigo pronto. ¡Gracias por escribirnos! 💬`;
-              await whatsappService.sendMessage(to, response);
-              await this.sendInteractiveButtons(to, "¿Deseas realizar otra consulta o finalizar?", [
-                { type: "reply", reply: { id: "consulta_otra", title: "🔁 Otra consulta" } },
-                { type: "reply", reply: { id: "consulta_finalizar", title: "❌ Finalizar" } }
-              ]);
-            } else {
-              response = `❓ Opción no válida. Por favor escribe el número o nombre de la consulta:\n\n1. Precios 💰\n2. Horarios 🕒\n3. Ubicación y contacto 📍\n4. Consultar mensualidad 🧾\n5. Pausar membresía ⏸️\n6. Contactar asesor 🤝`;
-              await whatsappService.sendMessage(to, response);
-            }
-            return;
+  if (["1", "precios", "membresia", "membresías"].includes(normalized)) {
+    response = `💰 *Precios y membresías:*\n\n- Mensual: $60.000 COP\n- Quincenal: $35.000 COP\n- Día: $10.000 COP\n\nIncluye acceso completo a todas las zonas del gimnasio, y orientación de los entrenadores.`;
+  } else if (["2", "horarios", "horario"].includes(normalized)) {
+    response = `🕒 *Horarios del Gym:*\n\nLunes a Viernes: 5:00am - 9:00pm\nSábados: 6:00am - 12:00m\nDomingos y festivos: Cerrado.`;
+  } else if (["3", "ubicacion", "ubicación", "contacto", "direccion", "dirección"].includes(normalized)) {
+    response = `📍 *Ubicación y contacto:*\n\n📌 Dirección: Calle 123 #45-67, Zarzal\n📞 Tel: +57 3116561249\n📧 Email: @gymbro@gmail.com\n🕘 Atención: Lun-Sáb en el horario establecido`;
+  } else if (["4", "estado", "miestado", "estado membresia"].includes(normalized)) {
+    response = `🧾 Para consultar tu estado de membresía, por favor responde con tu número de cédula.`;
+    state.step = "esperando_cedula";
+    return await whatsappService.sendMessage(to, response);
+  } else if (["5", "pausar", "pausar membresia", "pausarmembresia"].includes(normalized)) {
+    response = `📝 Para solicitar una pausa de tu membresía, primero necesito algunos datos.\n\nPor favor, escribe tu nombre y apellido:`;
+    state.step = "pausar_nombre";
+    return await whatsappService.sendMessage(to, response);
+  } else if (["6", "asesor", "hablar asesor", "ayuda", "asesoria"].includes(normalized)) {
+    response = `📲 Un asesor se pondrá en contacto contigo pronto. ¡Gracias por escribirnos! 💬`;
+  } else {
+    response = `❓ Opción no válida. Por favor escribe el número o nombre de la consulta:\n\n1. Precios 💰\n2. Horarios 🕒\n3. Ubicación y contacto 📍\n4. Consultar mensualidad 🧾\n5. Pausar membresía ⏸️\n6. Contactar asesor 🤝`;
+  }
+
+  // 👉 Solo se llega aquí si no cambia a otro paso
+  await whatsappService.sendMessage(to, response);
+  await this.sendInteractiveButtons(to, "¿Deseas realizar otra consulta o finalizar?", [
+    { type: "reply", reply: { id: "consulta_otra", title: "🔁 Otra consulta" } },
+    { type: "reply", reply: { id: "consulta_finalizar", title: "❌ Finalizar" } },
+  ]);
+  return;
 
 case "pausar_nombre":
     const nombreCompleto = message.trim();
@@ -680,19 +603,6 @@ case "pausar_motivo":
 
   async sendInteractiveButtons(to, text, buttons) {
     await whatsappService.sendInteractiveButtons(to, text, buttons);
-  }
-
-  // Agregar método para manejar el contador de consultas
-  checkConsultaLimit(from) {
-    const today = new Date().toDateString();
-    
-    // Reiniciar contador si es un nuevo día
-    if (this.lastConsultDate[from] !== today) {
-      this.consultaCounter[from] = 0;
-      this.lastConsultDate[from] = today;
-    }
-
-    return this.consultaCounter[from] < 3;
   }
 }
 
