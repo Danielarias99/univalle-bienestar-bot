@@ -558,15 +558,23 @@ case 'awaitingDayInput':
             } else if (["5", "pausar", "pausar membresia", "pausarmembresia"].includes(normalized)) {
               response = `📝 Para solicitar una pausa de tu membresía, primero necesito algunos datos.\n\nPor favor, escribe tu nombre y apellido:`;
               state.step = "pausar_nombre";
+              console.log(`⏳ Cambiando estado a 'pausar_nombre' para ${to}`);
               return await whatsappService.sendMessage(to, response);
             } else if (["6", "asesor", "hablar asesor", "ayuda", "asesoria"].includes(normalized)) {
-              response = `📲 Un asesor se pondrá en contacto contigo pronto. ¡Gracias por escribirnos! 💬`;
+              const advisorName = "Daniel Feria";
+              const advisorPhone = "+573116561249";
+              response = 
+                `Puedes contactar directamente a nuestro asesor *${advisorName}* 🧑‍💼:\n\n` +
+                `📞 Teléfono: ${advisorPhone}\n\n` +
+                `Puedes agregarlo a tus contactos o iniciar un chat directamente con él.`;
+              console.log(`📲 Enviando información de contacto del asesor a ${to}`);
             } else {
               response = `❓ Opción no válida. Por favor escribe el número o nombre de la consulta:\n\n1. Precios 💰\n2. Horarios 🕒\n3. Ubicación y contacto 📍\n4. Consultar mensualidad 🧾\n5. Pausar membresía ⏸️\n6. Contactar asesor 🤝`;
             }
 
-            // 👉 Solo se llega aquí si no cambia a otro paso
+            // 👉 Solo se llega aquí si no cambia a otro paso (como pausar o consultar cédula)
             await whatsappService.sendMessage(to, response);
+            console.log(`📤 Enviada respuesta para opción: ${option} a ${to}`);
             await this.sendInteractiveButtons(to, "¿Deseas realizar otra consulta o finalizar?", [
               { type: "reply", reply: { id: "consulta_otra", title: "🔁 Otra consulta" } },
               { type: "reply", reply: { id: "consulta_finalizar", title: "❌ Finalizar" } },
