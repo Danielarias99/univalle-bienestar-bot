@@ -10,10 +10,14 @@ import axios from "axios";
 import 'dotenv/config';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import QueryController from './src/controllers/queryController.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+// Importar el controlador usando ruta absoluta
+const { default: QueryController } = await import(
+    join(__dirname, 'src', 'controllers', 'queryController.js')
+);
 
 const app = express();
 app.use(express.json());

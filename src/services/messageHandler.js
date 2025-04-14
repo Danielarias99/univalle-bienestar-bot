@@ -18,6 +18,7 @@ class MessageHandler {
     this.consultaCounter = {}; // Contador de consultas por usuario
     this.lastConsultDate = {}; // Fecha de la última consulta
     this.userQueryCounts = {}; // { "+573001234567": { fecha: "2025-04-12", count: 1 } }
+    this.finalizedUsers = {};
   }
 
   isThanksOrClosure(message) {
@@ -36,103 +37,100 @@ class MessageHandler {
 
   async handleIncomingMessage(message, senderInfo) {
     const from = message.from;
-  
+    console.log('📝 Mensaje entrante:', message);
+
+    if (!message || !message.type) {
+      console.log('❌ Mensaje inválido recibido');
+      return;
+    }
+
     const allowedTypes = ["text", "interactive", "button", "image", "audio", "video", "document"];
     if (!allowedTypes.includes(message.type)) {
       console.log(`👀 Mensaje ignorado: tipo "${message.type}" de ${from}`);
       return;
     }
-  
-    // Si ya finalizó el chat, ignorar todo salvo que diga "hola"
-    const finalized = this.finalizedUsers?.[from];
-    
-    if (message?.type === 'text') {
+
+    // Manejar mensajes de texto
+    if (message.type === 'text') {
       const rawMessage = message.text.body.trim();
       const incomingMessage = rawMessage.toLowerCase();
-      const stripped = rawMessage.replace(/[\s\u200B-\u200D\uFEFF]/g, '');
-  
-      if (!stripped.length) {
-        console.log(`🕳️ Mensaje ignorado (vacío o sin contenido visible) de ${from}`);
-        return;
-      }
-  
-      if (finalized && !incomingMessage.includes('hola')) {
-        console.log(`👋 Usuario ${from} finalizó el chat. Ignorando: ${rawMessage}`);
-        return;
-      }
-  
-      const hasActiveFlow = this.appointmentState[from];
-      const isGreeting = this.isGreeting(incomingMessage);
-  
-      // Solo procesar si:
-      // 1. Es un saludo
-      // 2. O tiene un flujo activo
-      if (!hasActiveFlow && !isGreeting) {
-        console.log(`Mensaje ignorado de ${from} (no hay flujo activo ni es saludo): ${rawMessage}`);
-        return;
-      }
-  
-      if (isGreeting) {
-        delete this.finalizedUsers?.[from]; // 👈 vuelve a permitir mensajes
-        await this.sendWelcomeMessage(from, message.id, senderInfo);
-        await this.sendWelcomeMenu(from);
-      } else if (hasActiveFlow) {
-        await this.handleAppointmentFlow(from, rawMessage, message.id);
-      }
-  
-      await whatsappService.markAsRead(message.id);
-    }
-  
-    // ✅ Botones interactivos
-    else if (message?.type === "interactive") {
-      const option = message?.interactive?.button_reply?.id.toLowerCase().trim();
 
-      if (option === 'otra_consulta') {
-        if (this.consultaCounter[from] < 3) {
-          this.appointmentState[from] = { step: "esperando_pregunta_ia" };
-          await whatsappService.sendMessage(from, "🧠 Estoy listo para responder tu consulta. ¡Escribe tu pregunta!");
-        } else {
-          await whatsappService.sendMessage(from, "Has alcanzado el límite de 3 consultas por día. ¡Vuelve mañana! 😊");
-          this.finalizedUsers = this.finalizedUsers || {};
-          this.finalizedUsers[from] = true;
-          delete this.appointmentState?.[from];
+      console.log('📝 Mensaje recibido:', rawMessage);
+      console.log('🔄 Estado actual:', this.appointmentState[from]);
+
+      // Verificar si es un saludo
+      if (this.isGreeting(incomingMessage)) {
+        console.log('👋 Saludo detectado, enviando mensaje de bienvenida');
+        try {
+          delete this.finalizedUsers[from];
+          delete this.appointmentState[from];
+          
+          // Enviar mensaje de bienvenida y menú
+          await this.sendWelcomeMessage(from, message.id, senderInfo);
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          await this.sendWelcomeMenu(from);
+        } catch (error) {
+          console.error('❌ Error al enviar mensajes de bienvenida:', error);
         }
         return;
       }
 
-      if (option === 'finalizar_chat' || option === 'consulta_finalizar') {
-        this.finalizedUsers = this.finalizedUsers || {};
-        this.finalizedUsers[from] = true;
-        delete this.appointmentState?.[from];
-        await whatsappService.sendMessage(from, '✅ Consulta finalizada. Si necesitas algo más, escribe *Hola* para comenzar de nuevo. ¡Que tengas un excelente día! 💪');
+      // Si el chat está finalizado y no es un saludo, ignorar
+      if (this.finalizedUsers[from] && !this.isGreeting(incomingMessage)) {
+        console.log(`Chat finalizado para ${from}, ignorando mensaje`);
         return;
       }
 
-      if (option === 'volver_menu') {
-        delete this.finalizedUsers?.[from];
-        await this.sendWelcomeMessage(from, message.id, senderInfo);
-        await this.sendWelcomeMenu(from);
-        return;
-      }
-
-      if (option === 'opcion_3') {
-        this.appointmentState[from] = { step: "esperando_pregunta_ia" };
-        await whatsappService.sendMessage(from, "🧠 Estoy listo para responder tu consulta. ¡Escribe tu pregunta!");
-        return;
-      }
-
-      // Si tiene un flujo activo, manejarlo
+      // Procesar mensaje si hay un flujo activo
       if (this.appointmentState[from]) {
-        await this.handleAppointmentFlow(from, option, message.id);
-      } 
-      // Si es una opción del menú principal, procesarla
-      else if (['opcion_1', 'opcion_2'].includes(option)) {
-        await this.handleMenuOption(from, option);
+        await this.handleAppointmentFlow(from, rawMessage, message.id);
       }
-      // Si no es ninguna de las anteriores, ignorar
-      else {
-        console.log(`Botón ignorado de ${from} (no es opción válida): ${option}`);
-        return;
+
+      await whatsappService.markAsRead(message.id);
+    }
+
+    // Manejar interacciones con botones
+    else if (message.type === "interactive") {
+      const option = message?.interactive?.button_reply?.id.toLowerCase().trim();
+      console.log('Opción seleccionada:', option);
+
+      switch(option) {
+        case 'otra_consulta':
+          if (this.consultaCounter[from] < 3) {
+            this.appointmentState[from] = { step: "esperando_pregunta_ia" };
+            await whatsappService.sendMessage(from, "🧠 Estoy listo para responder tu consulta. ¡Escribe tu pregunta!");
+          } else {
+            await whatsappService.sendMessage(from, "Has alcanzado el límite de 3 consultas por día. ¡Vuelve mañana! 😊");
+            this.finalizedUsers[from] = true;
+            delete this.appointmentState[from];
+          }
+          break;
+
+        case 'finalizar_chat':
+        case 'consulta_finalizar':
+          this.finalizedUsers[from] = true;
+          delete this.appointmentState[from];
+          await whatsappService.sendMessage(from, '✅ Consulta finalizada. Si necesitas algo más, escribe *Hola* para comenzar de nuevo. ¡Que tengas un excelente día! 💪');
+          break;
+
+        case 'volver_menu':
+          delete this.finalizedUsers[from];
+          await this.sendWelcomeMessage(from, message.id, senderInfo);
+          await this.sendWelcomeMenu(from);
+          break;
+
+        case 'opcion_3':
+          this.appointmentState[from] = { step: "esperando_pregunta_ia" };
+          await whatsappService.sendMessage(from, "🧠 Estoy listo para responder tu consulta. ¡Escribe tu pregunta!");
+          break;
+
+        default:
+          if (this.appointmentState[from]) {
+            await this.handleAppointmentFlow(from, option, message.id);
+          } else if (['opcion_1', 'opcion_2'].includes(option)) {
+            await this.handleMenuOption(from, option);
+          }
+          break;
       }
 
       await whatsappService.markAsRead(message.id);
@@ -141,11 +139,25 @@ class MessageHandler {
 
 
   isGreeting(message) {
-    const greetings = ["hola", "hello", "hi", "hol", "ola", "buenas tardes", "buenos días", "buenas noches","hola, buenas noches","hola, buenos dias","hola, buenas tardes","buenas",
-    "hola, ¿cómo estás?", "hola, ¿me pueden ayudar?"];
+    const greetings = [
+      "hola", "hello", "hi", "hol", "ola", 
+      "buenas tardes", "buenos días", "buenas noches",
+      "buenas", "buen dia", "que tal", "saludos",
+      "hola buenos", "hola buenas", "hey", "holis",
+      "hola que tal", "como estas", "como va",
+      "hola necesito ayuda", "hola quisiera consultar"
+    ];
+    
     const normalizedMsg = message.toLowerCase()
-    .replace(/[¿?!¡.,-]/g, ""); // Elimina signos de puntuación
-    return greetings.some(greeting => normalizedMsg.includes(greeting));
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "") // Elimina acentos
+      .replace(/[¿?!¡.,-]/g, "") // Elimina signos de puntuación
+      .trim();
+
+    return greetings.some(greeting => 
+      normalizedMsg.includes(greeting) || 
+      normalizedMsg.startsWith(greeting)
+    );
   }
 
 

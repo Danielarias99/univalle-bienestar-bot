@@ -17,8 +17,8 @@ class WhatsAppService {
       if (messageId) {
         data.context = { message_id: messageId };
       }
-  
-      await axios.post(
+
+      const response = await axios.post(
         `https://graph.facebook.com/${config.API_VERSION}/${config.BUSINESS_PHONE}/messages`,
         data,
         {
@@ -28,15 +28,26 @@ class WhatsAppService {
           }
         }
       );
+
+      return response.data;
     } catch (error) {
-      console.error('Error sending message:', error.response?.data || error.message);
+      console.error('Error al enviar mensaje:', {
+        error: error.message,
+        response: error.response?.data,
+        config: {
+          API_VERSION: config.API_VERSION,
+          BUSINESS_PHONE: config.BUSINESS_PHONE,
+          hasToken: !!config.API_TOKEN
+        }
+      });
+      throw error;
     }
   }
   
 
   async markAsRead(messageId) {
     if (!messageId) {
-      console.error('Error marking message as read: messageId is required');
+      console.error('Error: messageId es requerido para marcar como leído');
       return;
     }
     try {
@@ -55,32 +66,30 @@ class WhatsAppService {
         }
       );
     } catch (error) {
-      console.error('Error marking message as read:', error.response?.data || error.message);
+      console.error('Error al marcar mensaje como leído:', error.response?.data || error.message);
     }
   }
 
-  async sendInteractiveButtons(to, bodyText, buttons) 
-  
-  
-  
-  {
-    if (!buttons || !Array.isArray(buttons) || buttons.length === 0) {
-      console.error('Error sending interactive buttons: buttons array is required');
-      return;
-    }
+  async sendInteractiveButtons(to, bodyText, buttons) {
     try {
-      await axios.post(
+      if (!buttons || !Array.isArray(buttons) || buttons.length === 0) {
+        throw new Error('Se requiere un array de botones válido');
+      }
+
+      const data = {
+        messaging_product: 'whatsapp',
+        to,
+        type: 'interactive',
+        interactive: {
+          type: 'button',
+          body: { text: bodyText },
+          action: { buttons }
+        }
+      };
+
+      const response = await axios.post(
         `https://graph.facebook.com/${config.API_VERSION}/${config.BUSINESS_PHONE}/messages`,
-        {
-          messaging_product: 'whatsapp',
-          to,
-          type: 'interactive',
-          interactive: {
-            type: 'button',
-            body: { text: bodyText },
-            action: { buttons }
-          }
-        },
+        data,
         {
           headers: {
             Authorization: `Bearer ${config.API_TOKEN}`,
@@ -88,8 +97,19 @@ class WhatsAppService {
           }
         }
       );
+
+      return response.data;
     } catch (error) {
-      console.error('Error sending interactive buttons:', error.response?.data || error.message);
+      console.error('Error al enviar botones:', {
+        error: error.message,
+        response: error.response?.data,
+        config: {
+          API_VERSION: config.API_VERSION,
+          BUSINESS_PHONE: config.BUSINESS_PHONE,
+          hasToken: !!config.API_TOKEN
+        }
+      });
+      throw error;
     }
   }
 
