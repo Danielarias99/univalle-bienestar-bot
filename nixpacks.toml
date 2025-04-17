@@ -1,11 +1,13 @@
 [phases.setup]
-nixPkgs = ["nodejs_20", "npm"]
+nixPkgs = ["nodejs_20", "nodePackages.npm"]
 
 [phases.install]
 cmds = ["npm install"]
 
 [phases.build]
-cmds = ["npm run build"]
+# Define commands to run during the build phase
+# No necesitamos un build step explícito si no transpilamos código
+# cmds = ["npm run build"]
 
 [start]
 cmd = "node server.js" 
