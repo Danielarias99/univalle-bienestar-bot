@@ -4,6 +4,9 @@ import config from '../config/env.js';
 class WhatsAppService {
   async sendMessage(to, body, messageId = null) {
     try {
+      if (!to || typeof to !== "string" || to.trim() === "") {
+        throw new Error("El parámetro 'to' debe ser un string no vacío.");
+      }
       if (!body || typeof body !== "string" || body.trim() === "") {
         throw new Error("El parámetro 'body' debe ser un string no vacío.");
       }
@@ -18,8 +21,8 @@ class WhatsAppService {
         data.context = { message_id: messageId };
       }
   
-      await axios.post(
-        `https://graph.facebook.com/v22.0/591259317412047/messages`,
+      const response = await axios.post(
+        `https://graph.facebook.com/${config.API_VERSION}/${config.BUSINESS_PHONE}/messages`,
         data,
         {
           headers: {
@@ -28,20 +31,21 @@ class WhatsAppService {
           }
         }
       );
+      return response.data;
     } catch (error) {
       console.error('Error sending message:', error.response?.data || error.message);
+      throw error;
     }
   }
   
-
   async markAsRead(messageId) {
-    if (!messageId) {
-      console.error('Error marking message as read: messageId is required');
-      return;
-    }
     try {
-      await axios.post(
-        `https://graph.facebook.com/v22.0/591259317412047/messages`,
+      if (!messageId || typeof messageId !== "string" || messageId.trim() === "") {
+        throw new Error("El parámetro 'messageId' debe ser un string no vacío.");
+      }
+
+      const response = await axios.post(
+        `https://graph.facebook.com/${config.API_VERSION}/${config.BUSINESS_PHONE}/messages`,
         {
           messaging_product: 'whatsapp',
           status: 'read',
@@ -54,23 +58,27 @@ class WhatsAppService {
           }
         }
       );
+      return response.data;
     } catch (error) {
       console.error('Error marking message as read:', error.response?.data || error.message);
+      throw error;
     }
   }
 
-  async sendInteractiveButtons(to, bodyText, buttons) 
-  
-  
-  
-  {
-    if (!buttons || !Array.isArray(buttons) || buttons.length === 0) {
-      console.error('Error sending interactive buttons: buttons array is required');
-      return;
-    }
+  async sendInteractiveButtons(to, bodyText, buttons) {
     try {
-      await axios.post(
-        `https://graph.facebook.com/v22.0/591259317412047/messages`,
+      if (!to || typeof to !== "string" || to.trim() === "") {
+        throw new Error("El parámetro 'to' debe ser un string no vacío.");
+      }
+      if (!bodyText || typeof bodyText !== "string" || bodyText.trim() === "") {
+        throw new Error("El parámetro 'bodyText' debe ser un string no vacío.");
+      }
+      if (!buttons || !Array.isArray(buttons) || buttons.length === 0) {
+        throw new Error("El parámetro 'buttons' debe ser un array no vacío.");
+      }
+
+      const response = await axios.post(
+        `https://graph.facebook.com/${config.API_VERSION}/${config.BUSINESS_PHONE}/messages`,
         {
           messaging_product: 'whatsapp',
           to,
@@ -88,39 +96,47 @@ class WhatsAppService {
           }
         }
       );
+      return response.data;
     } catch (error) {
       console.error('Error sending interactive buttons:', error.response?.data || error.message);
+      throw error;
     }
   }
 
   async sendMediaMessage(to, type, mediaUrl, caption) {
-    try{
-      const mediaObject = {}
+    try {
+      if (!to || typeof to !== "string" || to.trim() === "") {
+        throw new Error("El parámetro 'to' debe ser un string no vacío.");
+      }
+      if (!type || typeof type !== "string" || !["image", "audio", "video", "document"].includes(type)) {
+        throw new Error("Tipo de medio no soportado. Debe ser: image, audio, video o document");
+      }
+      if (!mediaUrl || typeof mediaUrl !== "string" || mediaUrl.trim() === "") {
+        throw new Error("El parámetro 'mediaUrl' debe ser un string no vacío.");
+      }
 
-      switch(type){
+      const mediaObject = {};
+      switch(type) {
         case "image":
-          mediaObject.image ={link: mediaUrl, caption: caption};
+          mediaObject.image = { link: mediaUrl, caption };
           break;
         case "audio":
-            mediaObject.audio ={ link:mediaUrl};
+          mediaObject.audio = { link: mediaUrl };
           break;
         case "video":
-              mediaObject.video = { link: mediaUrl, caption: caption};
-            break;
+          mediaObject.video = { link: mediaUrl, caption };
+          break;
         case "document":
-                mediaObject.document={link: mediaUrl, caption: caption, filename: "GymBro.pdf"};
-              break;
-
-        default:
-          throw new Error ("Not soported Media Type");
-            
+          mediaObject.document = { link: mediaUrl, caption, filename: "GymBro.pdf" };
+          break;
       }
-      await axios.post(
-        `https://graph.facebook.com/v22.0/591259317412047/messages`,
+
+      const response = await axios.post(
+        `https://graph.facebook.com/${config.API_VERSION}/${config.BUSINESS_PHONE}/messages`,
         {
           messaging_product: 'whatsapp',
           to,
-          type: type,
+          type,
           ...mediaObject
         },
         {
@@ -130,20 +146,12 @@ class WhatsAppService {
           }
         }
       );
-      
-
+      return response.data;
     } catch(error) {
-      console.error("Error sending Media;", error);
-
+      console.error("Error sending media:", error.response?.data || error.message);
+      throw error;
     }
   }
-
-
-
-
-
-
-
 }
 
 export default new WhatsAppService();
