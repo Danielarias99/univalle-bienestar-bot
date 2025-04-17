@@ -43,6 +43,17 @@ class MessageHandler {
     // Si ya finalizó el chat, ignorar todo salvo que diga "hola"
     const finalized = this.finalizedUsers?.[from];
     
+    if (message.id) {
+      console.log(`👁️ Intentando marcar mensaje ${message.id} como leído...`);
+      // Envolver en try/catch para que no detenga el flujo si falla
+      try {
+          await whatsappService.markAsRead(message.id);
+          console.log(`👁️ Mensaje ${message.id} marcado como leído.`);
+      } catch (readError) {
+          console.warn(`⚠️ No se pudo marcar mensaje ${message.id} como leído:`, readError.message);
+      }
+    }
+  
     if (message?.type === 'text') {
       const rawMessage = message.text.body.trim();
       const incomingMessage = rawMessage.toLowerCase();
@@ -76,8 +87,6 @@ class MessageHandler {
       } else if (hasActiveFlow) {
         await this.handleAppointmentFlow(from, rawMessage, message.id);
       }
-  
-      await whatsappService.markAsRead(message.id);
     }
   
     // ✅ Botones interactivos
@@ -119,8 +128,6 @@ class MessageHandler {
         console.log(`Botón ignorado de ${from} (no es opción válida): ${option}`);
         return;
       }
-
-      await whatsappService.markAsRead(message.id);
     }
   }
 
