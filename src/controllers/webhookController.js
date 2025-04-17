@@ -38,7 +38,14 @@ class WebhookController {
       console.log('🔍 Procesando valor:', JSON.stringify(valor, null, 2));
 
       // ---> AGREGAR ESTE LOG AQUÍ <--- 
-      console.log("📞 Phone Number ID entrante:", valor?.metadata?.phone_number_id);
+      const incomingPhoneNumberId = valor?.metadata?.phone_number_id;
+      console.log("📞 Phone Number ID entrante:", incomingPhoneNumberId);
+
+      // ---> AGREGAR ESTA VALIDACIÓN <--- 
+      if (incomingPhoneNumberId !== config.BUSINESS_PHONE) {
+        console.log(`🚫 Ignorando webhook. ID entrante (${incomingPhoneNumberId}) no coincide con BUSINESS_PHONE configurado (${config.BUSINESS_PHONE}).`);
+        return res.sendStatus(200); // Importante responder OK para que Meta no reintente
+      }
 
       // Extraer mensaje y contacto (manejando nombres en español e inglés)
       const mensajes = valor.mensajes || valor.messages;
