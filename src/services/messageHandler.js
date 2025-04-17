@@ -6,11 +6,6 @@ import { preguntarAGemini } from './geminiService.js'; // ✅ Import correcto de
 
 
 
-
-
-
-
-
 class MessageHandler {
   constructor() {
     this.appointmentState={};
