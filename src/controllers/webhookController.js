@@ -37,6 +37,9 @@ class WebhookController {
 
       console.log('🔍 Procesando valor:', JSON.stringify(valor, null, 2));
 
+      // ---> AGREGAR ESTE LOG AQUÍ <--- 
+      console.log("📞 Phone Number ID entrante:", valor?.metadata?.phone_number_id);
+
       // Extraer mensaje y contacto (manejando nombres en español e inglés)
       const mensajes = valor.mensajes || valor.messages;
       const contactos = valor.contactos || valor.contacts;
