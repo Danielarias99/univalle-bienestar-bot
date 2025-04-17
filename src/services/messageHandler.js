@@ -76,15 +76,32 @@ class MessageHandler {
       // 1. Es un saludo
       // 2. O tiene un flujo activo
       if (!hasActiveFlow && !isGreeting) {
-        console.log(`Mensaje ignorado de ${from} (no hay flujo activo ni es saludo): ${rawMessage}`);
+        console.log(`[handleIncomingMessage] Mensaje ignorado de ${from} (no hay flujo activo ni es saludo): ${rawMessage}`);
         return;
       }
   
       if (isGreeting) {
-        delete this.finalizedUsers?.[from]; // 👈 vuelve a permitir mensajes
-        await this.sendWelcomeMessage(from, message.id, senderInfo);
-        await this.sendWelcomeMenu(from);
+        console.log(`[handleIncomingMessage] 👋 Saludo detectado para ${from}! Ejecutando bloque de bienvenida...`); // Log al entrar
+        try {
+          // Intentar limpiar estado de finalizado
+          console.log(`[handleIncomingMessage] Intentando limpiar finalizedUsers para ${from}...`);
+          delete this.finalizedUsers?.[from]; // 👈 vuelve a permitir mensajes
+          console.log(`[handleIncomingMessage] finalizedUsers limpiado para ${from}.`);
+          
+          // Enviar bienvenida
+          console.log(`[handleIncomingMessage] Enviando mensaje de bienvenida a ${from}...`);
+          await this.sendWelcomeMessage(from, message.id, senderInfo);
+          console.log(`[handleIncomingMessage] Mensaje de bienvenida enviado a ${from}.`);
+          
+          // Enviar menú
+          console.log(`[handleIncomingMessage] Enviando menú de bienvenida a ${from}...`);
+          await this.sendWelcomeMenu(from);
+          console.log(`[handleIncomingMessage] ✅ Menú de bienvenida enviado a ${from}.`);
+        } catch (welcomeError) {
+          console.error(`[handleIncomingMessage] ❌ Error dentro del bloque de bienvenida para ${from}:`, welcomeError);
+        }
       } else if (hasActiveFlow) {
+        console.log(`[handleIncomingMessage] 🔄 Flujo activo detectado para ${from}. Llamando a handleAppointmentFlow...`);
         await this.handleAppointmentFlow(from, rawMessage, message.id);
       }
     }
