@@ -133,11 +133,31 @@ class MessageHandler {
 
 
   isGreeting(message) {
-    const greetings = ["hola", "hello", "hi", "hol", "ola", "buenas tardes", "buenos días", "buenas noches","hola, buenas noches","hola, buenos dias","hola, buenas tardes","buenas",
-    "hola, ¿cómo estás?", "hola, ¿me pueden ayudar?"];
+    console.log(`[isGreeting] Checking message: '${message}'`); // Log inicial
+    const greetings = [
+      "hola", "hello", "hi", "hol", "ola", 
+      "buenas tardes", "buenos días", "buenas noches",
+      "buenas", "buen dia", "que tal", "saludos",
+      "hola buenos", "hola buenas", "hey", "holis",
+      "hola que tal", "como estas", "como va",
+      "hola necesito ayuda", "hola quisiera consultar",
+      // Añadir posibles variaciones si es necesario
+      "hola,", "hola."
+    ];
+    
     const normalizedMsg = message.toLowerCase()
-    .replace(/[¿?!¡.,-]/g, ""); // Elimina signos de puntuación
-    return greetings.some(greeting => normalizedMsg.includes(greeting));
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "") // Elimina acentos
+      .replace(/[¿?!¡.,-]/g, "") // Elimina signos de puntuación
+      .trim();
+    console.log(`[isGreeting] Normalized message: '${normalizedMsg}'`); // Log normalizado
+
+    const result = greetings.some(greeting => 
+      normalizedMsg.includes(greeting) || 
+      normalizedMsg.startsWith(greeting)
+    );
+    console.log(`[isGreeting] Result: ${result}`); // Log resultado
+    return result;
   }
 
 
