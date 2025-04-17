@@ -1,7 +1,7 @@
 [phases.setup]
 # Define nix packages to install
-# Incluir solo nodejs_20, npm debería venir incluido
-nixPkgs = ["nodejs_20"]
+# Cambiar a Node.js 18 para que coincida con package.json
+nixPkgs = ["nodejs_18"]
 
 [phases.install]
 # Define commands to run during the install phase
