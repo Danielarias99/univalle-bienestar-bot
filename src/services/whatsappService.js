@@ -1,68 +1,21 @@
-import axios from 'axios';
-import config from '../config/env.js';
-
+import sendToWhatsApp from '..services/httpRequest/sendToWhatsApp.js';
 class WhatsAppService {
-  async sendMessage(to, body, messageId = null) {
-    try {
-      if (!to || typeof to !== "string" || to.trim() === "") {
-        throw new Error("El parámetro 'to' debe ser un string no vacío.");
-      }
-      if (!body || typeof body !== "string" || body.trim() === "") {
-        throw new Error("El parámetro 'body' debe ser un string no vacío.");
-      }
-  
-      const data = {
-        messaging_product: 'whatsapp',
-        to,
-        text: { body }
-      };
-  
-      if (messageId) {
-        data.context = { message_id: messageId };
-      }
-  
-      const response = await axios.post(
-        `https://graph.facebook.com/${config.API_VERSION}/${config.BUSINESS_PHONE}/messages`,
-        data,
-        {
-          headers: {
-            Authorization: `Bearer ${config.API_TOKEN}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-      return response.data;
-    } catch (error) {
-      console.error('Error sending message:', error.response?.data || error.message);
-      throw error;
-    }
+  async sendMessage(to, body, messageId) {
+    const data = {
+      messaging_product: 'whatsapp',
+      to,
+      text: { body }
+    };
+    await sendToWhatsApp(data);
   }
   
   async markAsRead(messageId) {
-    try {
-      if (!messageId || typeof messageId !== "string" || messageId.trim() === "") {
-        throw new Error("El parámetro 'messageId' debe ser un string no vacío.");
-      }
-
-      const response = await axios.post(
-        `https://graph.facebook.com/${config.API_VERSION}/${config.BUSINESS_PHONE}/messages`,
-        {
-          messaging_product: 'whatsapp',
-          status: 'read',
-          message_id: messageId
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${config.API_TOKEN}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-      return response.data;
-    } catch (error) {
-      console.error('Error marking message as read:', error.response?.data || error.message);
-      throw error;
-    }
+    const data = {
+      messaging_product: 'whatsapp',
+      to,
+      message_id: messageId
+    };
+    await sendToWhatsApp(data);
   }
 
   async sendInteractiveButtons(to, bodyText, buttons) {
