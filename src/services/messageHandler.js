@@ -683,12 +683,7 @@ case "pausar_motivo":
             
 
   // ✅ SOLO si NO cambia a otro step, se envían los botones
-  await whatsappService.sendMessage(to, response);
-  await this.sendInteractiveButtons(to, "¿Deseas realizar otra consulta o finalizar?", [
-    { type: "reply", reply: { id: "consulta_otra", title: "🔁 Otra consulta" } },
-    { type: "reply", reply: { id: "consulta_finalizar", title: "❌ Finalizar" } }
-  ]);
-  return;
+  // Este bloque será eliminado
 
     }
 
