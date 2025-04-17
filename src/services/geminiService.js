@@ -51,28 +51,19 @@ OFFICIAL GYMBRO INFORMATION:
 // Función para detectar el idioma
 function detectLanguage(text) {
   // Palabras comunes en inglés
-  const englishWords = [
-    'i', 'me', 'my', 'how', 'can', 'what', 'where', 'when', 'why', 'who',
-    'is', 'are', 'was', 'were', 'be', 'been', 'being',
-    'have', 'has', 'had', 'do', 'does', 'did',
-    'will', 'would', 'should', 'could', 'might',
-    'the', 'a', 'an', 'and', 'or', 'but',
-    'in', 'on', 'at', 'to', 'for', 'with',
-    'sleep', 'workout', 'gym', 'fitness', 'training',
-    'exercise', 'muscle', 'weight', 'body', 'health'
-  ];
+  const englishWords = ['hello', 'hi', 'hey', 'good', 'morning', 'afternoon', 'evening', 'night', 'please', 'thanks', 'thank', 'you', 'what', 'where', 'when', 'how', 'why', 'who', 'which', 'can', 'could', 'would', 'will', 'the', 'gym', 'fitness', 'workout', 'training', 'schedule', 'price', 'membership'];
   
-  const normalizedText = text.toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, '');
+  const normalizedText = text.toLowerCase();
   const words = normalizedText.split(/\s+/);
   
   // Contar palabras en inglés
   const englishWordCount = words.filter(word => englishWords.includes(word)).length;
   
-  // Si más del 20% de las palabras son en inglés o si contiene palabras clave en inglés
-  return englishWordCount / words.length > 0.2 || 
+  // Si más del 30% de las palabras son en inglés o si contiene "in english please"
+  return englishWordCount / words.length > 0.3 || 
          normalizedText.includes('in english') || 
-         /\b(i|me|my)\b/.test(normalizedText) ||  // Detecta pronombres personales en inglés
-         words[0].match(/\b(how|what|where|when|why|who)\b/); // Detecta preguntas en inglés
+         normalizedText.includes('english please') ||
+         normalizedText.includes('speak english');
 }
 
 export async function preguntarAGemini(userPrompt) {
@@ -87,9 +78,7 @@ export async function preguntarAGemini(userPrompt) {
     const systemContext = isEnglish 
       ? `You are a certified fitness coach, sports physiotherapist, medical wellness advisor, 
       and nutritionist working for GymBro — a high-performance center for training, health, and recovery. 
-      Your role is to provide clear, concise (maximum 2–3 paragraphs), and specific answers in English, 
-      tailored to real people. Focus on safe training practices, injury prevention, physical performance, 
-      recovery, functional nutrition, and overall health. Avoid generic responses. Use a friendly yet professional tone.
+      Your role is to provide clear, concise (maximum 2–3 paragraphs), and specific answers in English, tailored to real people. Focus on safe training practices, injury prevention, physical performance, recovery, functional nutrition, and overall health. Avoid generic responses. Use a friendly yet professional tone.
          
          IMPORTANT: When asked about schedules, prices, location or any gym information,
          YOU MUST use EXACTLY the information provided below. DO NOT invent or modify this data:
