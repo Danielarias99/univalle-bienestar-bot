@@ -10,4 +10,5 @@ export default {
   GEMINI_API_KEY: process.env.GEMINI_API_KEY,
   GOOGLE_CREDENTIALS_BASE64: process.env.GOOGLE_CREDENTIALS_BASE64,
   PORT: process.env.PORT || 3000,
+  BASE_URL: process.env.BASE_URL
 };
