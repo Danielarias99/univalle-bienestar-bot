@@ -1,21 +1,57 @@
 import sendToWhatsApp from './httpRequest/sendToWhatsApp.js';
+// Eliminamos la importación directa de axios y config si ya no se usan directamente aquí
+// import axios from 'axios';
+// import config from '../config/env.js'; 
+
 class WhatsAppService {
   async sendMessage(to, body, messageId) {
-    const data = {
-      messaging_product: 'whatsapp',
-      to,
-      text: { body }
-    };
-    await sendToWhatsApp(data);
+    try {
+      if (!to || typeof to !== "string" || to.trim() === "") {
+        throw new Error("El parámetro 'to' debe ser un string no vacío.");
+      }
+      if (!body || typeof body !== "string" || body.trim() === "") {
+        throw new Error("El parámetro 'body' debe ser un string no vacío.");
+      }
+
+      const data = {
+        messaging_product: 'whatsapp',
+        to,
+        text: { body }
+      };
+
+      if (messageId) {
+        data.context = { message_id: messageId };
+      }
+      
+      console.log("Enviando mensaje simple:", JSON.stringify(data));
+      return await sendToWhatsApp(data);
+    } catch (error) {
+      // Los errores ya se loguean en sendToWhatsApp, pero podemos añadir contexto si queremos
+      console.error('Error en WhatsAppService.sendMessage:', error.message);
+      throw error; // Re-lanzar para que el llamador sepa que falló
+    }
   }
   
   async markAsRead(messageId) {
-    const data = {
-      messaging_product: 'whatsapp',
-      to,
-      message_id: messageId
-    };
-    await sendToWhatsApp(data);
+    try {
+      if (!messageId || typeof messageId !== "string" || messageId.trim() === "") {
+        throw new Error("El parámetro 'messageId' debe ser un string no vacío.");
+      }
+      
+      // Payload correcto para marcar como leído
+      const data = {
+        messaging_product: 'whatsapp',
+        status: 'read',
+        message_id: messageId
+        // Quitamos 'to' que no es necesario y causaba error
+      };
+      
+      console.log("Marcando mensaje como leído:", JSON.stringify(data));
+      return await sendToWhatsApp(data);
+    } catch (error) {
+      console.error('Error en WhatsAppService.markAsRead:', error.message);
+      throw error;
+    }
   }
 
   async sendInteractiveButtons(to, bodyText, buttons) {
@@ -30,28 +66,22 @@ class WhatsAppService {
         throw new Error("El parámetro 'buttons' debe ser un array no vacío.");
       }
 
-      const response = await axios.post(
-        `https://graph.facebook.com/${config.API_VERSION}/${config.BUSINESS_PHONE}/messages`,
-        {
-          messaging_product: 'whatsapp',
-          to,
-          type: 'interactive',
-          interactive: {
-            type: 'button',
-            body: { text: bodyText },
-            action: { buttons }
-          }
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${config.API_TOKEN}`,
-            'Content-Type': 'application/json'
-          }
+      // Construimos el payload y usamos sendToWhatsApp
+      const data = {
+        messaging_product: 'whatsapp',
+        to,
+        type: 'interactive',
+        interactive: {
+          type: 'button',
+          body: { text: bodyText },
+          action: { buttons }
         }
-      );
-      return response.data;
+      };
+
+      console.log("Enviando botones interactivos:", JSON.stringify(data));
+      return await sendToWhatsApp(data);
     } catch (error) {
-      console.error('Error sending interactive buttons:', error.response?.data || error.message);
+      console.error('Error en WhatsAppService.sendInteractiveButtons:', error.message);
       throw error;
     }
   }
@@ -69,6 +99,13 @@ class WhatsAppService {
       }
 
       const mediaObject = {};
+      const data = {
+        messaging_product: 'whatsapp',
+        to,
+        type: type
+      };
+
+      // Construimos el objeto específico del medio
       switch(type) {
         case "image":
           mediaObject.image = { link: mediaUrl, caption };
@@ -80,28 +117,20 @@ class WhatsAppService {
           mediaObject.video = { link: mediaUrl, caption };
           break;
         case "document":
-          mediaObject.document = { link: mediaUrl, caption, filename: "GymBro.pdf" };
+          // Asegurarse de que el caption sea opcional si no se proporciona
+          mediaObject.document = { link: mediaUrl, filename: "GymBro.pdf" }; 
+          if (caption) {
+            mediaObject.document.caption = caption;
+          }
           break;
       }
+      // Agregamos el objeto del medio al payload principal
+      data[type] = mediaObject[type];
 
-      const response = await axios.post(
-        `https://graph.facebook.com/${config.API_VERSION}/${config.BUSINESS_PHONE}/messages`,
-        {
-          messaging_product: 'whatsapp',
-          to,
-          type,
-          ...mediaObject
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${config.API_TOKEN}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-      return response.data;
+      console.log("Enviando mensaje multimedia:", JSON.stringify(data));
+      return await sendToWhatsApp(data);
     } catch(error) {
-      console.error("Error sending media:", error.response?.data || error.message);
+      console.error('Error en WhatsAppService.sendMediaMessage:', error.message);
       throw error;
     }
   }
