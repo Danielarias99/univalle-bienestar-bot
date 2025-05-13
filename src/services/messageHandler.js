@@ -179,7 +179,8 @@ class MessageHandler {
 
   async sendWelcomeMessage(to, messageId, senderInfo) {
     const name = this.getSenderName(senderInfo);
-    const now = new Date().getHours();
+    // Obtener la hora actual en la zona horaria de Colombia
+    const now = parseInt(new Date().toLocaleString("en-US", { timeZone: "America/Bogota", hour: '2-digit', hour12: false }));
 
 
 // 1. Modifica esta parte para el saludo horario (usa tus variables existentes)
