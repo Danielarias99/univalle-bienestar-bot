@@ -190,7 +190,7 @@ else timeGreeting = "¡Buenas noches!";
 
 
 
-    const welcomeMessage =`Hola,${timeGreeting} ${name} 👋\n` + 
+    const welcomeMessage =`${timeGreeting} ${name} 👋\n` + 
     `¡Bienvenido a *GymBro*!💪🏋️‍♂️🔥\n` +
     `Somos tu aliado para alcanzar tus objetivos fitness. 💯\n` +
     `¿En qué puedo ayudarte hoy?📌\n`;
