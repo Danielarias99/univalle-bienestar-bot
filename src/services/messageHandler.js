@@ -10,6 +10,7 @@ class MessageHandler {
   constructor() {
     this.appointmentState={};
     this.userData = {};
+    this.iaUsageData = {}; // Para rastrear el uso de consultas IA
   }
 
   isThanksOrClosure(message) {
@@ -129,6 +130,32 @@ class MessageHandler {
       if (option === 'opcion_3') {
         this.appointmentState[from] = { step: "verificando_acceso_ia" };
         await whatsappService.sendMessage(from, "🔒 Para acceder a la consulta con IA, por favor ingresa tu número de cédula:");
+        return;
+      }
+
+      if (option === 'otra_consulta_ia') {
+        if (this.appointmentState[from]?.step === "esperando_pregunta_ia") {
+            if (this.canAskGemini(from)) {
+                await whatsappService.sendMessage(from, "🧠 ¡Claro! Escribe tu siguiente pregunta:");
+                // El estado ya es "esperando_pregunta_ia", no se cambia.
+                // La próxima pregunta de texto que envíe se registrará con recordGeminiQuery.
+            } else {
+                console.log(`[handleIncomingMessage] Límite de uso de IA alcanzado para ${from} al intentar 'otra_consulta_ia'.`);
+                await whatsappService.sendMessage(from, "Has alcanzado tu límite de 3 consultas con IA por ahora. Por favor, inténtalo de nuevo en 2 horas.");
+                await this.sendInteractiveButtons(from, "¿Qué deseas hacer ahora?", [
+                    { type: "reply", reply: { id: "volver_menu", title: "🏠 Volver al menú" } },
+                    { type: "reply", reply: { id: "finalizar_chat", title: "✅ Finalizar chat" } }
+                ]);
+                delete this.appointmentState[from]; // Limpiar estado de la cita actual
+            }
+        } else {
+            // Caso raro, el usuario no debería tener este botón si no está en el flujo IA
+            console.warn(`[handleIncomingMessage] Botón 'otra_consulta_ia' presionado por ${from} fuera del estado esperado.`);
+            await whatsappService.sendMessage(from, "Parece que hubo un error. Volviendo al menú principal.");
+            delete this.appointmentState?.[from];
+            await this.sendWelcomeMessage(from, message.id, senderInfo); // Enviar bienvenida y menú de nuevo
+            await this.sendWelcomeMenu(from);
+        }
         return;
       }
 
@@ -297,6 +324,7 @@ else timeGreeting = "¡Buenas noches!";
     if (state.step === "esperando_pregunta_ia") {
       await whatsappService.sendMessage(to, "🤖 Pensando... un momento por favor.");
       const respuestaIA = await preguntarAGemini(message);
+      this.recordGeminiQuery(to); // Registrar la consulta DESPUÉS de hacerla
       
       // Dividir respuesta si es muy larga
       const MAX_LENGTH = 4000;
@@ -310,10 +338,16 @@ else timeGreeting = "¡Buenas noches!";
       }
 
       // Mantener el estado para seguir en modo IA
-      state.step = "esperando_pregunta_ia";
+      // state.step = "esperando_pregunta_ia"; // Ya está en este estado
       
       // Solo mostrar botón de finalizar con mensaje más preciso
-      await this.sendInteractiveButtons(to, "Si has terminado, puedes finalizar la consulta:", [
+      // await this.sendInteractiveButtons(to, "Si has terminado, puedes finalizar la consulta:", [
+      //   { type: "reply", reply: { id: "finalizar_chat", title: "❌ Finalizar consulta" } }
+      // ]);
+
+      // Ofrecer nuevas opciones después de la respuesta de la IA
+      await this.sendInteractiveButtons(to, "¿Ahora qué quieres hacer?", [
+        { type: "reply", reply: { id: "otra_consulta_ia", title: "🤔 Otra consulta IA" } },
         { type: "reply", reply: { id: "finalizar_chat", title: "❌ Finalizar consulta" } }
       ]);
       return;
@@ -373,9 +407,19 @@ else timeGreeting = "¡Buenas noches!";
         console.log(`[verificando_acceso_ia] Resultado de consultarMembresia:`, resultadoConsulta);
 
         if (resultadoConsulta && resultadoConsulta.encontrado && resultadoConsulta.datos?.estado === 'activo') {
-          console.log(`[verificando_acceso_ia] ✅ Acceso concedido para ${to} (Cédula: ${cedulaIA})`);
-          this.appointmentState[to] = { step: "esperando_pregunta_ia" };
-          await whatsappService.sendMessage(to, "🧠 ¡Acceso concedido! Estoy listo para responder tu consulta. Escribe tu pregunta:");
+          if (this.canAskGemini(to)) {
+            console.log(`[verificando_acceso_ia] ✅ Acceso concedido para ${to} (Cédula: ${cedulaIA}). Puede usar IA.`);
+            this.appointmentState[to] = { step: "esperando_pregunta_ia" };
+            await whatsappService.sendMessage(to, "🧠 ¡Acceso concedido! Estoy listo para responder tu consulta. Escribe tu pregunta:");
+          } else {
+            console.log(`[verificando_acceso_ia] ❌ Límite de uso de IA alcanzado para ${to} (Cédula: ${cedulaIA}).`);
+            await whatsappService.sendMessage(to, "Has alcanzado tu límite de 3 consultas con IA por ahora. Por favor, inténtalo de nuevo en 2 horas.");
+            await this.sendInteractiveButtons(to, "¿Qué deseas hacer ahora?", [
+                { type: "reply", reply: { id: "volver_menu", title: "🏠 Volver al menú" } },
+                { type: "reply", reply: { id: "finalizar_chat", title: "✅ Finalizar chat" } }
+            ]);
+            delete this.appointmentState[to]; // Limpiar estado de la cita actual
+          }
         } else if (resultadoConsulta && resultadoConsulta.encontrado) {
           console.log(`[verificando_acceso_ia] ❌ Acceso denegado para ${to} (Cédula: ${cedulaIA}). Estado: ${resultadoConsulta.datos?.estado}`);
           await whatsappService.sendMessage(to, `Lo siento, la consulta con IA es solo para miembros activos. Tu estado actual es: *${resultadoConsulta.datos?.estado || 'Desconocido'}*.
@@ -746,6 +790,46 @@ case "pausar_motivo":
 
   async sendInteractiveButtons(to, text, buttons) {
     await whatsappService.sendInteractiveButtons(to, text, buttons);
+  }
+
+  // Funciones para gestionar el límite de uso de IA
+  canAskGemini(from) {
+    const now = new Date().getTime();
+    const twoHoursInMillis = 2 * 60 * 60 * 1000;
+    this.iaUsageData[from] = this.iaUsageData[from] || { count: 0, timestamp: now }; // Inicializar si no existe
+
+    const usage = this.iaUsageData[from];
+
+    if (now - usage.timestamp > twoHoursInMillis) {
+      console.log(`[canAskGemini] Reseteando contador para ${from} después de 2 horas.`);
+      usage.count = 0; // Resetear contador
+      usage.timestamp = now; // Actualizar timestamp al inicio del nuevo ciclo
+    }
+    
+    const canAsk = usage.count < 3;
+    console.log(`[canAskGemini] Usuario ${from}: Puede preguntar a Gemini = ${canAsk}, Conteo actual = ${usage.count}`);
+    return canAsk;
+  }
+
+  recordGeminiQuery(from) {
+    const now = new Date().getTime();
+    // Asegurar inicialización, aunque canAskGemini ya debería haberlo hecho si era el primer ciclo.
+    this.iaUsageData[from] = this.iaUsageData[from] || { count: 0, timestamp: now }; 
+    
+    const usage = this.iaUsageData[from];
+    
+    // Si el timestamp es de un ciclo anterior (más de 2h), canAskGemini lo reseteó a 0 y actualizó el timestamp.
+    // Aquí solo incrementamos el contador para el ciclo actual.
+    if (now - usage.timestamp > (2 * 60 * 60 * 1000)) { 
+        // Esto sucedería si recordGeminiQuery se llama sin una llamada previa a canAskGemini en el mismo flujo lógico, lo cual no debería ocurrir.
+        // Por seguridad, se resetea si el timestamp es muy viejo.
+        console.log(`[recordGeminiQuery] Timestamp viejo para ${from}, reseteando y contando como 1.`);
+        usage.count = 1;
+        usage.timestamp = now;
+    } else {
+        usage.count += 1;
+    }
+    console.log(`[recordGeminiQuery] Uso de IA para ${from} registrado:`, usage);
   }
 }
 
