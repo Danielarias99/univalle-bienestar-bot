@@ -127,8 +127,8 @@ class MessageHandler {
       }
 
       if (option === 'opcion_3') {
-        this.appointmentState[from] = { step: "esperando_pregunta_ia" };
-        await whatsappService.sendMessage(from, "🧠 Estoy listo para responder tu consulta. ¡Escribe tu pregunta!");
+        this.appointmentState[from] = { step: "verificando_acceso_ia" };
+        await whatsappService.sendMessage(from, "🔒 Para acceder a la consulta con IA, por favor ingresa tu número de cédula:");
         return;
       }
 
@@ -234,8 +234,8 @@ else timeGreeting = "¡Buenas noches!";
           break;
         
           case "opcion_3":
-            this.appointmentState[to] = { step: "esperando_pregunta_ia" };
-            response = "🧠 Estoy listo para responder tu consulta. ¡Escribe tu pregunta!";
+            this.appointmentState[to] = { step: "verificando_acceso_ia" };
+            response = "🔒 Para acceder a la consulta con IA, por favor ingresa tu número de cédula:";
             break;
           
     }
@@ -355,6 +355,54 @@ else timeGreeting = "¡Buenas noches!";
         delete state.step; // Limpiar estado incluso si hay error
       }
       return; // Importante: Terminar aquí después de manejar la cédula
+    }
+
+    // Nuevo case para verificar acceso a la IA
+    if (state.step === "verificando_acceso_ia") {
+      const cedulaIA = message.trim();
+      console.log(`[verificando_acceso_ia] Cédula recibida para acceso IA: ${cedulaIA} para usuario ${to}`);
+      if (!/^\d{6,10}$/.test(cedulaIA)) {
+        await whatsappService.sendMessage(to, "⚠️ Por favor ingresa un número de cédula válido (entre 6 y 10 dígitos).");
+        return; // Mantenemos el estado verificando_acceso_ia
+      }
+
+      try {
+        console.log(`[verificando_acceso_ia] Llamando a consultarMembresia con cédula: ${cedulaIA}`);
+        await whatsappService.sendMessage(to, "Verificando tu acceso... ⏳"); // Mensaje de espera
+        const resultadoConsulta = await consultarMembresia(cedulaIA);
+        console.log(`[verificando_acceso_ia] Resultado de consultarMembresia:`, resultadoConsulta);
+
+        if (resultadoConsulta && resultadoConsulta.encontrado && resultadoConsulta.datos?.estado === 'activo') {
+          console.log(`[verificando_acceso_ia] ✅ Acceso concedido para ${to} (Cédula: ${cedulaIA})`);
+          this.appointmentState[to] = { step: "esperando_pregunta_ia" };
+          await whatsappService.sendMessage(to, "🧠 ¡Acceso concedido! Estoy listo para responder tu consulta. Escribe tu pregunta:");
+        } else if (resultadoConsulta && resultadoConsulta.encontrado) {
+          console.log(`[verificando_acceso_ia] ❌ Acceso denegado para ${to} (Cédula: ${cedulaIA}). Estado: ${resultadoConsulta.datos?.estado}`);
+          await whatsappService.sendMessage(to, `Lo siento, la consulta con IA es solo para miembros activos. Tu estado actual es: *${resultadoConsulta.datos?.estado || 'Desconocido'}*.
+Puedes realizar otras consultas o volver al menú.`);
+          delete this.appointmentState[to]; // Limpiar estado
+          // Ofrecer opciones generales
+          await this.sendInteractiveButtons(to, "¿Qué deseas hacer?", [
+            { type: "reply", reply: { id: "consulta_otra", title: "🔁 Otra consulta" } },
+            { type: "reply", reply: { id: "volver_menu", title: "🏠 Volver al menú" } },
+            { type: "reply", reply: { id: "finalizar_chat", title: "✅ Finalizar chat" } }
+          ]);
+        } else {
+          console.log(`[verificando_acceso_ia] ❌ Cédula ${cedulaIA} no encontrada para acceso IA.`);
+          await whatsappService.sendMessage(to, "❌ No se encontró una membresía con esa cédula. Verifica el número o contacta a un asesor.");
+          delete this.appointmentState[to]; // Limpiar estado
+          await this.sendInteractiveButtons(to, "¿Qué deseas hacer?", [
+            { type: "reply", reply: { id: "consulta_otra", title: "🔁 Otra consulta" } },
+            { type: "reply", reply: { id: "volver_menu", title: "🏠 Volver al menú" } },
+            { type: "reply", reply: { id: "finalizar_chat", title: "✅ Finalizar chat" } }
+          ]);
+        }
+      } catch (error) {
+        console.error(`[verificando_acceso_ia] ❌ Error al verificar acceso IA para ${cedulaIA}:`, error);
+        await whatsappService.sendMessage(to, "❌ Ocurrió un error al verificar tu acceso. Por favor, intenta más tarde.");
+        delete this.appointmentState[to]; // Limpiar estado en caso de error grave
+      }
+      return; // Terminar aquí después de manejar la verificación para IA
     }
 
   
