@@ -223,10 +223,10 @@ else timeGreeting = "¡Buenas noches!";
 
 
 
-    const welcomeMessage =`${timeGreeting} ${name} 👋\n` + 
+    const welcomeMessage =`Hola, ${timeGreeting} ${name} 👋\n` + 
     `¡Bienvenido a *GymBro*!💪🏋️‍♂️🔥\n` +
     `Somos tu aliado para alcanzar tus objetivos fitness. 💯\n` +
-    `¿En qué puedo ayudarte hoy?📌\n`;
+    `¿En qué puedo ayudarte hoy?\n`;
    
 
 
@@ -477,7 +477,7 @@ Puedes realizar otras consultas o volver al menú.`);
 
   state.age = age;
   state.step = 'awaitingDayInput';
-  response = `📅 ¿Para qué día quieres agendar tu clase?\n\n1. Lunes\n2. Martes\n3. Miércoles\n4. Jueves\n5. Viernes\n6. Sábado`;
+  response = `📅 ¿Para qué día quieres agendar tu clase? por favor escribe el número del dia o el dia.\n\n1. Lunes\n2. Martes\n3. Miércoles\n4. Jueves\n5. Viernes\n6. Sábado`;
   break;
 
 case 'awaitingDayInput':
