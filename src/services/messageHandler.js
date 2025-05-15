@@ -83,6 +83,10 @@ class MessageHandler {
           delete this.finalizedUsers?.[from]; // 👈 vuelve a permitir mensajes
           console.log(`[handleIncomingMessage] finalizedUsers limpiado para ${from}.`);
           
+          // Limpiar el estado de la conversación anterior
+          delete this.appointmentState?.[from];
+          console.log(`[handleIncomingMessage] appointmentState limpiado para ${from}.`);
+          
           // Enviar bienvenida
           console.log(`[handleIncomingMessage] Enviando mensaje de bienvenida a ${from}...`);
           await this.sendWelcomeMessage(from, message.id, senderInfo);
@@ -116,6 +120,7 @@ class MessageHandler {
 
       if (option === 'volver_menu') {
         delete this.finalizedUsers?.[from];
+        delete this.appointmentState?.[from];
         await this.sendWelcomeMessage(from, message.id, senderInfo);
         await this.sendWelcomeMenu(from);
         return;
@@ -469,157 +474,157 @@ case 'awaitingDayInput':
         }
         break;
   
-      case "trainerSelection":
-        const trainerInput = message.trim().toLowerCase();
-        let selectedTrainer = null;
+        case "trainerSelection":
+          const trainerInput = message.trim().toLowerCase();
+          let selectedTrainer = null;
   
-        if (["1", "mateo", "mat"].some(v => trainerInput.includes(v))) {
-          selectedTrainer = "Mateo";
-        } else if (["2", "laura", "lau"].some(v => trainerInput.includes(v))) {
-          selectedTrainer = "Laura";
-        } else if (["3", "andres", "andrés", "andr"].some(v => trainerInput.includes(v))) {
-          selectedTrainer = "Andrés";
-        }
+          if (["1", "mateo", "mat"].some(v => trainerInput.includes(v))) {
+            selectedTrainer = "Mateo";
+          } else if (["2", "laura", "lau"].some(v => trainerInput.includes(v))) {
+            selectedTrainer = "Laura";
+          } else if (["3", "andres", "andrés", "andr"].some(v => trainerInput.includes(v))) {
+            selectedTrainer = "Andrés";
+          }
   
-        if (selectedTrainer) {
-          state.reason = `Entrenador Personal con ${selectedTrainer}`;
-          state.step = "confirmation";
-          response = `📝 *Resumen de tu clase agendada:*\n\n👤 Nombre: ${state.name}\n🎂 Edad: ${state.age}\n📅 Día: ${state.day}\n🕒 Hora: ${state.hour}\n🏋️ Clase: ${state.reason}\n\n¿Deseas confirmar tu cita?`;
-          await whatsappService.sendMessage(to, response);
-          await this.sendInteractiveButtons(to, "Confirma tu cita:", [
-            { type: "reply", reply: { id: "confirmar", title: "✅ Confirmar" } },
-            { type: "reply", reply: { id: "cancelar", title: "❌ Cancelar" } }
-          ]);
-          return;
-        } else {
-          response = "Por favor selecciona un entrenador válido (1, 2, 3 o su nombre). Ej: Mateo, Laura o Andrés.";
-        }
-        break;
+          if (selectedTrainer) {
+            state.reason = `Entrenador Personal con ${selectedTrainer}`;
+            state.step = "confirmation";
+            response = `📝 *Resumen de tu clase agendada:*\n\n👤 Nombre: ${state.name}\n🎂 Edad: ${state.age}\n📅 Día: ${state.day}\n🕒 Hora: ${state.hour}\n🏋️ Clase: ${state.reason}\n\n¿Deseas confirmar tu cita?`;
+            await whatsappService.sendMessage(to, response);
+            await this.sendInteractiveButtons(to, "Confirma tu cita:", [
+              { type: "reply", reply: { id: "confirmar", title: "✅ Confirmar" } },
+              { type: "reply", reply: { id: "cancelar", title: "❌ Cancelar" } }
+            ]);
+            return;
+          } else {
+            response = "Por favor selecciona un entrenador válido (1, 2, 3 o su nombre). Ej: Mateo, Laura o Andrés.";
+          }
+          break;
   
-        case "confirmation":
-          if (message === "confirmar") {
-            try {
-              const existingAppointments = await getAppointments();
-              const alreadyRegistered = existingAppointments.some(
-                (appointment) =>
-                  appointment.name === state.name &&
-                  appointment.day === state.day &&
-                  appointment.reason === state.reason
-              );
-        
-              if (alreadyRegistered) {
-                await whatsappService.sendMessage(
-                  to,
-                  "📌 Ya tienes una clase agendada con esos datos. Si necesitas cambiarla, responde con *cancelar* y vuelve a intentarlo.",
-                  messageId
+          case "confirmation":
+            if (message === "confirmar") {
+              try {
+                const existingAppointments = await getAppointments();
+                const alreadyRegistered = existingAppointments.some(
+                  (appointment) =>
+                    appointment.name === state.name &&
+                    appointment.day === state.day &&
+                    appointment.reason === state.reason
                 );
-              } else {
-                const row = [
-                  to,
-                  state.name,
-                  state.age,
-                  state.day,
-                  state.reason,
-                  state.hour,
-                  new Date().toLocaleString("es-CO", { timeZone: "America/Bogota" })
-                ];
-                
-                console.log('Intentando guardar en sheets:', row);
-                const result = await appendToSheet(row);
-                console.log('Resultado de sheets:', result);
-                
+          
+                if (alreadyRegistered) {
+                  await whatsappService.sendMessage(
+                    to,
+                    "📌 Ya tienes una clase agendada con esos datos. Si necesitas cambiarla, responde con *cancelar* y vuelve a intentarlo.",
+                    messageId
+                  );
+                } else {
+                  const row = [
+                    to,
+                    state.name,
+                    state.age,
+                    state.day,
+                    state.reason,
+                    state.hour,
+                    new Date().toLocaleString("es-CO", { timeZone: "America/Bogota" })
+                  ];
+                  
+                  console.log('Intentando guardar en sheets:', row);
+                  const result = await appendToSheet(row);
+                  console.log('Resultado de sheets:', result);
+                  
+                  await whatsappService.sendMessage(
+                    to,
+                    "✅ ¡Tu clase ha sido agendada y registrada! Nos pondremos en contacto contigo en un momento para confirmar la fecha y hora. ¡Nos vemos pronto! 💪",
+                    messageId
+                  );
+                }
+              } catch (err) {
+                console.error("❌ Error al procesar la cita en messageHandler:", err);
+                // Loguear detalles específicos del error de Sheets si existen
+                if (err.response?.data?.error) {
+                  console.error("Detalles del error de Google Sheets API:", err.response.data.error);
+                }
                 await whatsappService.sendMessage(
                   to,
-                  "✅ ¡Tu clase ha sido agendada y registrada! Nos pondremos en contacto contigo en un momento para confirmar la fecha y hora. ¡Nos vemos pronto! 💪",
+                  "⚠️ Ocurrió un error al guardar los datos. Por favor, inténtalo de nuevo más tarde o contacta a un asesor.",
                   messageId
                 );
               }
-            } catch (err) {
-              console.error("❌ Error al procesar la cita en messageHandler:", err);
-              // Loguear detalles específicos del error de Sheets si existen
-              if (err.response?.data?.error) {
-                console.error("Detalles del error de Google Sheets API:", err.response.data.error);
-              }
+          
+              delete this.appointmentState[to];
+          
+              // 🔘 Botones finales
+              await this.sendInteractiveButtons(to, "¿Qué deseas hacer ahora?", [
+                { type: "reply", reply: { id: "finalizar_chat", title: "✅ Finalizar chat" } },
+                { type: "reply", reply: { id: "volver_menu", title: "🏠 Volver al menú" } }
+              ]);
+          
+            } else if (message === "cancelar") {
               await whatsappService.sendMessage(
                 to,
-                "⚠️ Ocurrió un error al guardar los datos. Por favor, inténtalo de nuevo más tarde o contacta a un asesor.",
+                "❌ Tu cita ha sido cancelada.",
+                messageId
+              );
+          
+              delete this.appointmentState[to];
+          
+              // 🔘 Botones finales también después de cancelar
+              await this.sendInteractiveButtons(to, "¿Qué deseas hacer ahora?", [
+                { type: "reply", reply: { id: "finalizar_chat", title: "✅ Finalizar chat" } },
+                { type: "reply", reply: { id: "volver_menu", title: "🏠 Volver al menú" } }
+              ]);
+          
+            } else {
+              await whatsappService.sendMessage(
+                to,
+                "Por favor elige una opción válida para confirmar o cancelar.",
                 messageId
               );
             }
-        
-            delete this.appointmentState[to];
-        
-            // 🔘 Botones finales
-            await this.sendInteractiveButtons(to, "¿Qué deseas hacer ahora?", [
-              { type: "reply", reply: { id: "finalizar_chat", title: "✅ Finalizar chat" } },
-              { type: "reply", reply: { id: "volver_menu", title: "🏠 Volver al menú" } }
-            ]);
-        
-          } else if (message === "cancelar") {
-            await whatsappService.sendMessage(
-              to,
-              "❌ Tu cita ha sido cancelada.",
-              messageId
-            );
-        
-            delete this.appointmentState[to];
-        
-            // 🔘 Botones finales también después de cancelar
-            await this.sendInteractiveButtons(to, "¿Qué deseas hacer ahora?", [
-              { type: "reply", reply: { id: "finalizar_chat", title: "✅ Finalizar chat" } },
-              { type: "reply", reply: { id: "volver_menu", title: "🏠 Volver al menú" } }
-            ]);
-        
-          } else {
-            await whatsappService.sendMessage(
-              to,
-              "Por favor elige una opción válida para confirmar o cancelar.",
-              messageId
-            );
-          }
-          return;
-
-
-          case "consultas_lista":
-            const option = message.trim().toLowerCase();
-            const normalized = option.replace(/[^a-z0-9áéíóúñü]/gi, '').toLowerCase();
-
-            if (["1", "precios", "membresia", "membresías"].includes(normalized)) {
-              response = `💰 *Precios y membresías:*\n\n- Mensual: $60.000 COP\n- Quincenal: $35.000 COP\n- Día: $10.000 COP\n\nIncluye acceso completo a todas las zonas del gimnasio, y orientación de los entrenadores.`;
-            } else if (["2", "horarios", "horario"].includes(normalized)) {
-              response = `🕒 *Horarios del Gym:*\n\nLunes a Viernes: 5:00am - 9:00pm\nSábados: 6:00am - 12:00m\nDomingos y festivos: Cerrado.`;
-            } else if (["3", "ubicacion", "ubicación", "contacto", "direccion", "dirección"].includes(normalized)) {
-              response = `📍 *Ubicación y contacto:*\n\n📌 Dirección: Calle 123 #45-67, Zarzal\n📞 Tel: +57 3116561249\n📧 Email: @gymbro@gmail.com\n🕘 Atención: Lun-Sáb en el horario establecido`;
-            } else if (["4", "estado", "miestado", "estado membresia", "consultar mensualidad"].includes(normalized)) { // Añadido "consultar mensualidad"
-              response = `🧾 Para consultar tu estado de membresía, por favor responde con tu número de cédula.`;
-              state.step = "esperando_cedula";
-              console.log(`⏳ Cambiando estado a 'esperando_cedula' para ${to}`);
-              return await whatsappService.sendMessage(to, response);
-            } else if (["5", "pausar", "pausar membresia", "pausarmembresia"].includes(normalized)) {
-              response = `📝 Para solicitar una pausa de tu membresía, primero necesito algunos datos.\n\nPor favor, escribe tu nombre y apellido:`;
-              state.step = "pausar_nombre";
-              console.log(`⏳ Cambiando estado a 'pausar_nombre' para ${to}`);
-              return await whatsappService.sendMessage(to, response);
-            } else if (["6", "asesor", "hablar asesor", "ayuda", "asesoria"].includes(normalized)) {
-              const advisorName = "Daniel Feria";
-              const advisorPhone = "+573116561249";
-              response = 
-                `Puedes contactar directamente a nuestro asesor *${advisorName}* 🧑‍💼:\n\n` +
-                `📞 Teléfono: ${advisorPhone}\n\n` +
-                `Puedes agregarlo a tus contactos o iniciar un chat directamente con él.`;
-              console.log(`📲 Enviando información de contacto del asesor a ${to}`);
-            } else {
-              response = `❓ Opción no válida. Por favor escribe el número o nombre de la consulta:\n\n1. Precios 💰\n2. Horarios 🕒\n3. Ubicación y contacto 📍\n4. Consultar mensualidad 🧾\n5. Pausar membresía ⏸️\n6. Contactar asesor 🤝`;
-            }
-
-            // 👉 Solo se llega aquí si no cambia a otro paso (como pausar o consultar cédula)
-            await whatsappService.sendMessage(to, response);
-            console.log(`📤 Enviada respuesta para opción: ${option} a ${to}`);
-            await this.sendInteractiveButtons(to, "¿Deseas realizar otra consulta o finalizar?", [
-              { type: "reply", reply: { id: "consulta_otra", title: "🔁 Otra consulta" } },
-              { type: "reply", reply: { id: "consulta_finalizar", title: "❌ Finalizar" } },
-            ]);
             return;
+
+
+            case "consultas_lista":
+              const option = message.trim().toLowerCase();
+              const normalized = option.replace(/[^a-z0-9áéíóúñü]/gi, '').toLowerCase();
+
+              if (["1", "precios", "membresia", "membresías"].includes(normalized)) {
+                response = `💰 *Precios y membresías:*\n\n- Mensual: $60.000 COP\n- Quincenal: $35.000 COP\n- Día: $10.000 COP\n\nIncluye acceso completo a todas las zonas del gimnasio, y orientación de los entrenadores.`;
+              } else if (["2", "horarios", "horario"].includes(normalized)) {
+                response = `🕒 *Horarios del Gym:*\n\nLunes a Viernes: 5:00am - 9:00pm\nSábados: 6:00am - 12:00m\nDomingos y festivos: Cerrado.`;
+              } else if (["3", "ubicacion", "ubicación", "contacto", "direccion", "dirección"].includes(normalized)) {
+                response = `📍 *Ubicación y contacto:*\n\n📌 Dirección: Calle 123 #45-67, Zarzal\n📞 Tel: +57 3116561249\n📧 Email: @gymbro@gmail.com\n🕘 Atención: Lun-Sáb en el horario establecido`;
+              } else if (["4", "estado", "miestado", "estado membresia", "consultar mensualidad"].includes(normalized)) { // Añadido "consultar mensualidad"
+                response = `🧾 Para consultar tu estado de membresía, por favor responde con tu número de cédula.`;
+                state.step = "esperando_cedula";
+                console.log(`⏳ Cambiando estado a 'esperando_cedula' para ${to}`);
+                return await whatsappService.sendMessage(to, response);
+              } else if (["5", "pausar", "pausar membresia", "pausarmembresia"].includes(normalized)) {
+                response = `📝 Para solicitar una pausa de tu membresía, primero necesito algunos datos.\n\nPor favor, escribe tu nombre y apellido:`;
+                state.step = "pausar_nombre";
+                console.log(`⏳ Cambiando estado a 'pausar_nombre' para ${to}`);
+                return await whatsappService.sendMessage(to, response);
+              } else if (["6", "asesor", "hablar asesor", "ayuda", "asesoria"].includes(normalized)) {
+                const advisorName = "Daniel Feria";
+                const advisorPhone = "+573116561249";
+                response = 
+                  `Puedes contactar directamente a nuestro asesor *${advisorName}* 🧑‍💼:\n\n` +
+                  `📞 Teléfono: ${advisorPhone}\n\n` +
+                  `Puedes agregarlo a tus contactos o iniciar un chat directamente con él.`;
+                console.log(`📲 Enviando información de contacto del asesor a ${to}`);
+              } else {
+                response = `❓ Opción no válida. Por favor escribe el número o nombre de la consulta:\n\n1. Precios 💰\n2. Horarios 🕒\n3. Ubicación y contacto 📍\n4. Consultar mensualidad 🧾\n5. Pausar membresía ⏸️\n6. Contactar asesor 🤝`;
+              }
+
+              // 👉 Solo se llega aquí si no cambia a otro paso (como pausar o consultar cédula)
+              await whatsappService.sendMessage(to, response);
+              console.log(`📤 Enviada respuesta para opción: ${option} a ${to}`);
+              await this.sendInteractiveButtons(to, "¿Deseas realizar otra consulta o finalizar?", [
+                { type: "reply", reply: { id: "consulta_otra", title: "🔁 Otra consulta" } },
+                { type: "reply", reply: { id: "consulta_finalizar", title: "❌ Finalizar" } },
+              ]);
+              return;
 
 case "pausar_nombre":
     const nombreCompleto = message.trim();
