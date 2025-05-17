@@ -241,7 +241,7 @@ else timeGreeting = "¡Buenas noches!";
     const buttons = [
       { type: "reply", reply: { id: "opcion_1", title: "Agendar clases" } },
       { type: "reply", reply: { id: "opcion_2", title: "Consultar servicios" } },
-      { type: "reply", reply: { id: "opcion_3", title: "Consulta abierta IA🤖 " } },
+      { type: "reply", reply: { id: "opcion_3", title: "Consulta abierta IA🤖 " } }
     ];
   
     await whatsappService.sendInteractiveButtons(to, menuMessage, buttons);
@@ -257,7 +257,7 @@ else timeGreeting = "¡Buenas noches!";
         break;
         case "opcion_2":
           this.appointmentState[to] = { step: "consultas_lista" };
-          response = `📋 *Opciones de consulta:*\n\n1. Precios 💰\n2. Horarios 🕒\n3. Ubicación y contacto 📍\n4. Consultar mensualidad 🧾\n5. Pausar membresía ⏸️\n6. Contactar asesor 🤝`;
+          response = `📋 *Opciones de consulta:*\n\n1. Precios 💰\n2. Horarios 🕒\n3. Ubicación y contacto 📍\n4. Consultar mensualidad 🧾\n5. Pausar membresía ⏸️\n6. Contactar asesor 🤝\n7. Ver productos de la tienda 🛍️`;
           break;
         
           case "opcion_3":
@@ -705,8 +705,29 @@ case 'awaitingDayInput':
                   `📞 Teléfono: ${advisorPhone}\n\n` +
                   `Puedes agregarlo a tus contactos o iniciar un chat directamente con él.`;
                 console.log(`📲 Enviando información de contacto del asesor a ${to}`);
+              } else if (["7", "ver productos", "productos tienda", "productos", "tienda"].includes(normalized) || option === "7") { // Nueva condición para la opción 7
+                const pdfUrl = "URL_DEL_PDF_AQUI"; // <--- REEMPLAZA ESTO CON TU URL REAL
+                const caption = "Aquí tienes nuestro catálogo de productos y precios. 📄";
+                try {
+                  await whatsappService.sendMediaMessage(to, "document", pdfUrl, caption);
+                  console.log(`[${to}] PDF de productos enviado.`);
+                  // Opcional: Enviar botones de "Otra consulta" / "Finalizar"
+                  await this.sendInteractiveButtons(to, "¿Deseas realizar otra consulta o finalizar?", [
+                    { type: "reply", reply: { id: "consulta_otra", title: "🔁 Otra consulta" } },
+                    { type: "reply", reply: { id: "consulta_finalizar", title: "❌ Finalizar" } },
+                  ]);
+                } catch (error) {
+                  console.error(`[${to}] Error al enviar PDF de productos:`, error);
+                  await whatsappService.sendMessage(to, "Lo siento, hubo un problema al intentar mostrarte los productos. Por favor, intenta de nuevo más tarde. 🙏");
+                  // También ofrecer opciones después de un error
+                  await this.sendInteractiveButtons(to, "¿Deseas realizar otra consulta o finalizar?", [
+                    { type: "reply", reply: { id: "consulta_otra", title: "🔁 Otra consulta" } },
+                    { type: "reply", reply: { id: "consulta_finalizar", title: "❌ Finalizar" } },
+                  ]);
+                }
+                return; // Importante para salir después de enviar el PDF
               } else {
-                response = `❓ Opción no válida. Por favor escribe el número o nombre de la consulta:\n\n1. Precios 💰\n2. Horarios 🕒\n3. Ubicación y contacto 📍\n4. Consultar mensualidad 🧾\n5. Pausar membresía ⏸️\n6. Contactar asesor 🤝`;
+                response = `❓ Opción no válida. Por favor escribe el número o nombre de la consulta:\n\n1. Precios 💰\n2. Horarios 🕒\n3. Ubicación y contacto 📍\n4. Consultar mensualidad 🧾\n5. Pausar membresía ⏸️\n6. Contactar asesor 🤝\n7. Ver productos de la tienda 🛍️`; // Asegurarse de que el mensaje de error también incluya la opción 7
               }
 
               // 👉 Solo se llega aquí si no cambia a otro paso (como pausar o consultar cédula)
