@@ -1,6 +1,6 @@
 import { response } from 'express';
 import whatsappService from './whatsappService.js';
-import { appendToSheet, getAppointments, appendPauseToSheet, consultarMembresia } from './googleSheestsService.js';
+import { appendToSheet, getAppointments, appendPauseToSheet, consultarMembresia, getAllActiveMemberships } from './googleSheestsService.js';
 import { preguntarAGemini } from './geminiService.js'; // ✅ Import correcto de Gemini
 
 
@@ -830,6 +830,53 @@ case "pausar_motivo":
         usage.count += 1;
     }
     console.log(`[recordGeminiQuery] Uso de IA para ${from} registrado:`, usage);
+  }
+
+  // 🆕 Función para verificar y enviar recordatorios de renovación de membresía
+  async checkAndSendMembershipReminders() {
+    console.log('[checkAndSendMembershipReminders] Iniciando verificación de recordatorios de membresía...');
+    try {
+      const activeMemberships = await getAllActiveMemberships();
+      if (!activeMemberships || activeMemberships.length === 0) {
+        console.log('[checkAndSendMembershipReminders] No hay membresías activas para verificar.');
+        return;
+      }
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // Normalizar a medianoche para comparaciones de solo fecha
+
+      let remindersSent = 0;
+
+      for (const member of activeMemberships) {
+        if (!member.fechaFin || !member.telefono || !member.nombre) {
+          console.warn(`[checkAndSendMembershipReminders] Datos incompletos para miembro: ${JSON.stringify(member)}, saltando.`);
+          continue;
+        }
+
+        const endDate = new Date(member.fechaFin);
+        endDate.setHours(0, 0, 0, 0); // Normalizar a medianoche
+
+        // Calcular la diferencia en días
+        const timeDiff = endDate.getTime() - today.getTime();
+        const daysRemaining = Math.ceil(timeDiff / (1000 * 60 * 60 * 24));
+
+        console.log(`[checkAndSendMembershipReminders] Verificando a ${member.nombre} (Tel: ${member.telefono}). Fecha Fin: ${member.fechaFin.toISOString().split('T')[0]}, Días restantes: ${daysRemaining}`);
+
+        if (daysRemaining === 2) {
+          const reminderMessage = `¡Hola ${member.nombre}! 👋 Te recordamos que tu membresía en GymBro está por vencer en 2 días (${endDate.toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' })}). No olvides acercarte a nuestras instalaciones para renovarla y seguir disfrutando de todos los beneficios. ¡Te esperamos! 💪`;
+          try {
+            await whatsappService.sendMessage(member.telefono, reminderMessage);
+            console.log(`[checkAndSendMembershipReminders] ✅ Recordatorio enviado a ${member.nombre} (Tel: ${member.telefono})`);
+            remindersSent++;
+          } catch (error) {
+            console.error(`[checkAndSendMembershipReminders] ❌ Error enviando recordatorio a ${member.nombre} (Tel: ${member.telefono}):`, error.message);
+          }
+        }
+      }
+      console.log(`[checkAndSendMembershipReminders] Verificación completada. ${remindersSent} recordatorios enviados.`);
+    } catch (error) {
+      console.error('[checkAndSendMembershipReminders] ❌ Error general durante la verificación de recordatorios:', error);
+    }
   }
 }
 

@@ -193,6 +193,92 @@ async function consultarMembresia(cedula) {
     }
 }
 
+// 🆕 Función para obtener todas las membresías activas
+async function getAllActiveMemberships() {
+    console.log("[getAllActiveMemberships] Iniciando obtención de todas las membresías activas.");
+    if (!authClient) {
+        console.log('[getAllActiveMemberships] 🔄 Reintentando autenticación de Google Sheets...');
+        try {
+            authClient = await getAuthClient();
+        } catch (error) {
+            console.error('[getAllActiveMemberships] ❌ Falló la re-autenticación.');
+            throw new Error('Error interno al conectar con Google Sheets al obtener membresías.');
+        }
+    }
+    try {
+        const spreadsheetId = "1sNHbR0y52mlRE3z5E8JTaOMktUro3fPm6ZZPxXIUVZY";
+        console.log(`[getAllActiveMemberships] 🔍 Consultando Spreadsheet ID: ${spreadsheetId}, Range: Base de Datos`);
+        const response = await sheets.spreadsheets.values.get({
+            spreadsheetId,
+            range: "Base de Datos!A:G", // Leer columnas A hasta G
+            auth: authClient,
+        });
+        console.log('[getAllActiveMemberships] ✅ Consulta a API de Google Sheets exitosa.');
+        const rows = response.data.values || [];
+        console.log(`[getAllActiveMemberships] ${rows.length} filas obtenidas de 'Base de Datos'.`);
+
+        if (rows.length <= 1) { // Considerar que la primera fila puede ser de encabezados
+            console.log("[getAllActiveMemberships] No hay suficientes datos en la hoja.");
+            return [];
+        }
+
+        // Asumir que la primera fila es de encabezados y la omitimos.
+        // Columnas esperadas: Telefono, Cedula, Nombre, TiempoPago, FechaInicio, FechaFin, Estado
+        const activeMemberships = [];
+        const header = rows[0].map(h => String(h).trim().toLowerCase());
+        const phoneIndex = header.indexOf("telefono");
+        const nameIndex = header.indexOf("nombre");
+        const endDateIndex = header.indexOf("fechafin"); // Asegurarse que el encabezado es 'fechafin'
+        const statusIndex = header.indexOf("estado");
+
+        if (phoneIndex === -1 || nameIndex === -1 || endDateIndex === -1 || statusIndex === -1) {
+            console.error("[getAllActiveMemberships] ❌ No se encontraron todos los encabezados necesarios (telefono, nombre, fechafin, estado) en 'Base de Datos'. Verifica los nombres de las columnas.");
+            // Intentar usar índices fijos como fallback o lanzar error
+            // Por ahora, lanzaremos un error para forzar la corrección de encabezados.
+            throw new Error("Encabezados faltantes o incorrectos en la hoja 'Base de Datos'.");
+        }
+        
+        // Iterar desde la segunda fila (índice 1)
+        for (let i = 1; i < rows.length; i++) {
+            const row = rows[i];
+            // Asegurarse que la fila y las celdas necesarias existen
+            if (!row || !row[statusIndex] || !row[endDateIndex] || !row[phoneIndex] || !row[nameIndex]) {
+                console.warn(`[getAllActiveMemberships] Fila ${i+1} incompleta, saltando.`);
+                continue;
+            }
+
+            const estado = String(row[statusIndex]).toLowerCase().trim();
+            const fechaFinStr = row[endDateIndex];
+            const telefono = String(row[phoneIndex]).trim();
+            const nombre = String(row[nameIndex]).trim();
+
+            if (estado === 'activo') {
+                try {
+                    const fechaFin = new Date(fechaFinStr);
+                    if (isNaN(fechaFin.getTime())) {
+                        console.warn(`[getAllActiveMemberships] Fecha de fin inválida ('${fechaFinStr}') para ${nombre} (tel: ${telefono}) en fila ${i+1}. Saltando.`);
+                        continue;
+                    }
+                    activeMemberships.push({
+                        telefono,
+                        nombre,
+                        fechaFin,
+                        estado
+                    });
+                } catch (dateError) {
+                    console.warn(`[getAllActiveMemberships] Error parseando fechaFin '${fechaFinStr}' para ${nombre} (tel: ${telefono}) en fila ${i+1}:`, dateError);
+                }
+            }
+        }
+        console.log(`[getAllActiveMemberships] ${activeMemberships.length} membresías activas encontradas.`);
+        return activeMemberships;
+
+    } catch (error) {
+        console.error(`[getAllActiveMemberships] ❌ Error durante la obtención de membresías activas:`, error.response?.data || error.message, error.stack);
+        throw error; // Propagar el error para manejo superior
+    }
+}
+
 // Leer citas (opcional, si no se usa se puede quitar)
 async function getAppointments() {
     if (!authClient) {
@@ -230,4 +316,4 @@ async function getAppointments() {
     }
 }
 
-export { appendToSheet, appendPauseToSheet, getAppointments, consultarMembresia };
+export { appendToSheet, appendPauseToSheet, getAppointments, consultarMembresia, getAllActiveMemberships };
