@@ -768,8 +768,8 @@ case "pausar_motivo":
     delete this.appointmentState[to];
     await whatsappService.sendMessage(to, response);
     await this.sendInteractiveButtons(to, "¿Qué deseas hacer ahora?", [
-      { type: "reply", reply: { id: "volver_menu", title: "🏠 Volver al menú" } },
-      { type: "reply", reply: { id: "finalizar_chat", title: "✅ Finalizar chat" } }
+      { type: "reply", reply: { id: "consulta_otra", title: "🔁 Otra consulta" } },
+      { type: "reply", reply: { id: "consulta_finalizar", title: "❌ Finalizar" } }
     ]);
     return;
 
