@@ -1,5 +1,9 @@
 import config from '../config/env.js';
 import messageHandler from '../services/messageHandler.js';
+import whatsappService from '../services/whatsappService.js';
+
+const activeConversations = new Map(); // Gestor de conversaciones activas
+const INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutos
 
 class WebhookController {
   async handleIncoming(req, res) {
@@ -82,6 +86,34 @@ class WebhookController {
           } : undefined
         } : undefined
       };
+
+      const userId = adaptedMessage.from; // Usar el 'from' como ID de usuario
+
+      if (userId) {
+        if (activeConversations.has(userId)) {
+          const existingConversation = activeConversations.get(userId);
+          clearTimeout(existingConversation.timerId);
+          console.log(`[${userId}] Temporizador existente limpiado.`);
+        }
+
+        const timerId = setTimeout(async () => {
+          console.log(`[${userId}] Chat finalizado por inactividad después de 10 minutos.`);
+          try {
+            await whatsappService.sendMessage(userId, "Tu sesión de chat ha finalizado debido a inactividad. Si necesitas algo más, simplemente envía 'Hola' para reiniciar.");
+            console.log(`[${userId}] Mensaje de finalización por inactividad enviado.`);
+          } catch (error) {
+            console.error(`[${userId}] Error al enviar mensaje de finalización por inactividad:`, error);
+          }
+          activeConversations.delete(userId);
+          console.log(`[${userId}] Conversación eliminada del gestor.`);
+        }, INACTIVITY_TIMEOUT_MS);
+
+        activeConversations.set(userId, { 
+          lastActivity: Date.now(),
+          timerId: timerId 
+        });
+        console.log(`[${userId}] Nueva actividad registrada. Temporizador configurado para 10 minutos.`);
+      }
 
       const adaptedSenderInfo = contacto ? {
         profile: {
