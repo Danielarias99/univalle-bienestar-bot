@@ -69,7 +69,7 @@ class MessageHandler {
       const isGreeting = this.isGreeting(incomingMessage);
   
       // Solo procesar si:
-      // 1. Es un saludo
+      // 1. Es un saludo (mensaje exacto)
       // 2. O tiene un flujo activo
       if (!hasActiveFlow && !isGreeting) {
         console.log(`[handleIncomingMessage] Mensaje ignorado de ${from} (no hay flujo activo ni es saludo): ${rawMessage}`);
@@ -197,8 +197,7 @@ class MessageHandler {
     console.log(`[isGreeting] Normalized message: '${normalizedMsg}'`); // Log normalizado
 
     const result = greetings.some(greeting => 
-      normalizedMsg.includes(greeting) || 
-      normalizedMsg.startsWith(greeting)
+      normalizedMsg === greeting
     );
     console.log(`[isGreeting] Result: ${result}`); // Log resultado
     return result;
@@ -706,7 +705,7 @@ case 'awaitingDayInput':
                   `Puedes agregarlo a tus contactos o iniciar un chat directamente con él.`;
                 console.log(`📲 Enviando información de contacto del asesor a ${to}`);
               } else if (["7", "ver productos", "productos tienda", "productos", "tienda"].includes(normalized) || option === "7") { // Nueva condición para la opción 7
-                const pdfUrl = "URL_DEL_PDF_AQUI"; // <--- REEMPLAZA ESTO CON TU URL REAL
+                const pdfUrl = "https://chatbotgymbro.s3.us-east-2.amazonaws.com/planes_precios_gymbro.pdf"; // <--- REEMPLAZA ESTO CON TU URL REAL
                 const caption = "Aquí tienes nuestro catálogo de productos y precios. 📄";
                 try {
                   await whatsappService.sendMediaMessage(to, "document", pdfUrl, caption);

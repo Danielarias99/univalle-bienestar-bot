@@ -99,8 +99,13 @@ class WebhookController {
         const timerId = setTimeout(async () => {
           console.log(`[${userId}] Chat finalizado por inactividad después de 10 minutos.`);
           try {
-            await whatsappService.sendMessage(userId, "Tu sesión de chat ha finalizado debido a inactividad. Si necesitas algo más, simplemente envía 'Hola' para reiniciar.");
-            console.log(`[${userId}] Mensaje de finalización por inactividad enviado.`);
+            // Solo enviar el mensaje si el usuario NO finalizó el chat manualmente
+            if (!messageHandler.finalizedUsers?.[userId]) {
+              await whatsappService.sendMessage(userId, "Tu sesión de chat ha finalizado debido a inactividad. Si necesitas algo más, simplemente envía 'Hola' para reiniciar.");
+              console.log(`[${userId}] Mensaje de finalización por inactividad enviado.`);
+            } else {
+              console.log(`[${userId}] No se envía mensaje de inactividad porque el usuario finalizó el chat manualmente.`);
+            }
           } catch (error) {
             console.error(`[${userId}] Error al enviar mensaje de finalización por inactividad:`, error);
           }
