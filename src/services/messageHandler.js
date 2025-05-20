@@ -313,6 +313,8 @@ else timeGreeting = "¡Buenas noches!";
     }
 
     if (message === "consulta_finalizar") {
+      this.finalizedUsers = this.finalizedUsers || {};
+      this.finalizedUsers[to] = true;
       delete this.appointmentState[to];
       const response = `✅ Consulta finalizada. ¡Gracias por comunicarte con *GymBro*! Si deseas volver a consultar, escribe *Hola* 💬.`;
       await whatsappService.sendMessage(to, response);
