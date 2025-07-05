@@ -222,9 +222,9 @@ else timeGreeting = "¡Buenas noches!";
 
 
 
-    const welcomeMessage =`Hola, ${timeGreeting} ${name} 👋\n` + 
-    `¡Bienvenido a *GymBro*!💪🏋️‍♂️🔥\n` +
-    `Somos tu aliado para alcanzar tus objetivos fitness. 💯\n` +
+    const welcomeMessage =`${timeGreeting} ${name} 👋\n` + 
+    `¡Bienvenido(a) al Asistente Virtual de Bienestar Universitario de la Universidad del Valle! 🎓❤️\n` +
+    `\nEstoy aquí para apoyarte en tu bienestar físico, emocional y académico.\n` +
     `¿En qué puedo ayudarte hoy?\n`;
    
 
@@ -238,9 +238,8 @@ else timeGreeting = "¡Buenas noches!";
   async sendWelcomeMenu(to) {
     const menuMessage = "Elige una opción";
     const buttons = [
-      { type: "reply", reply: { id: "opcion_1", title: "Agendar clases" } },
-      { type: "reply", reply: { id: "opcion_2", title: "Consultar servicios" } },
-      { type: "reply", reply: { id: "opcion_3", title: "Consulta abierta IA🤖 " } }
+      { type: "reply", reply: { id: "opcion_1", title: "Psicología 🧠" } },
+      { type: "reply", reply: { id: "opcion_2", title: "Comedor Universitario 🍽️" } }
     ];
   
     await whatsappService.sendInteractiveButtons(to, menuMessage, buttons);
@@ -251,19 +250,13 @@ else timeGreeting = "¡Buenas noches!";
     let response;
     switch (option) {
       case "opcion_1":
-        this.appointmentState[to]= {step:"name"}
-        response = "Por favor, Ingresa tu nombre y apellido";
+        this.appointmentState[to] = { step: "psicologia_menu" };
+        response = `🧠 *Servicios de Psicología - Bienestar Universitario*\n\n1. Agendar cita de orientación psicológica 📅\n2. Consultar horarios de atención 🕒\n3. Información sobre servicios psicológicos ℹ️\n4. Contactar psicólogo de turno 👨‍⚕️`;
         break;
-        case "opcion_2":
-          this.appointmentState[to] = { step: "consultas_lista" };
-          response = `📋 *Opciones de consulta:*\n\n1. Precios 💰\n2. Horarios 🕒\n3. Ubicación y contacto 📍\n4. Consultar mensualidad 🧾\n5. Pausar membresía ⏸️\n6. Contactar asesor 🤝\n7. Ver productos de la tienda 🛍️`;
-          break;
-        
-          case "opcion_3":
-            this.appointmentState[to] = { step: "verificando_acceso_ia" };
-            response = "🔒 Para acceder a la consulta con IA, por favor ingresa tu número de cédula:";
-            break;
-          
+      case "opcion_2":
+        this.appointmentState[to] = { step: "comedor_menu" };
+        response = `🍽️ *Comedor Universitario - Universidad del Valle*\n\n1. Consultar menú del día 🍳\n2. Horarios de servicio 🕐\n3. Precios y formas de pago 💰\n4. Información nutricional 📊\n5. Sugerencias y comentarios 💬`;
+        break;
     }
     await whatsappService.sendMessage(to, response);
   }
@@ -452,6 +445,85 @@ Puedes realizar otras consultas o volver al menú.`);
 
   
     switch (state.step) {
+      case 'psicologia_menu':
+        const psicologiaOption = message.trim().toLowerCase();
+        if (["1", "agendar", "cita", "orientacion", "orientación"].some(v => psicologiaOption.includes(v))) {
+          state.step = "psicologia_nombre";
+          response = "📝 Para agendar tu cita de orientación psicológica, necesito algunos datos.\n\nPor favor, escribe tu nombre completo:";
+        } else if (["2", "horarios", "atención", "atencion"].some(v => psicologiaOption.includes(v))) {
+          response = `🕒 *Horarios de Atención Psicológica:*\n\nLunes a Viernes: 8:00 AM - 6:00 PM\nSábados: 8:00 AM - 12:00 PM\n\n📍 Ubicación: Edificio de Bienestar Universitario\n📞 Teléfono: (032) 3212100 ext. 1234`;
+        } else if (["3", "información", "informacion", "servicios"].some(v => psicologiaOption.includes(v))) {
+          response = `ℹ️ *Servicios Psicológicos Disponibles:*\n\n• Orientación vocacional y profesional\n• Apoyo en crisis emocionales\n• Talleres de manejo de estrés\n• Consejería académica\n• Terapia individual y grupal\n\nTodos los servicios son gratuitos para estudiantes activos.`;
+        } else if (["4", "contactar", "psicólogo", "psicologo", "turno"].some(v => psicologiaOption.includes(v))) {
+          response = `👨‍⚕️ *Psicólogos de Turno:*\n\nDr. Carlos Mendoza - Lunes a Miércoles\nDra. Ana Rodríguez - Jueves a Sábado\n\n📞 Contacto directo: (032) 3212100 ext. 1235\n📧 Email: psicologia@univalle.edu.co`;
+        } else {
+          response = "❓ Por favor selecciona una opción válida (1-4):\n\n1. Agendar cita de orientación psicológica 📅\n2. Consultar horarios de atención 🕒\n3. Información sobre servicios psicológicos ℹ️\n4. Contactar psicólogo de turno 👨‍⚕️";
+        }
+        break;
+
+      case 'psicologia_nombre':
+        if (!/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/.test(message)) {
+          response = '⚠️ Por favor ingresa solo tu nombre completo, sin números ni caracteres especiales.';
+          break;
+        }
+        state.nombre = message.trim();
+        state.step = "psicologia_codigo";
+        response = '🎓 Ahora ingresa tu código estudiantil:';
+        break;
+
+      case 'psicologia_codigo':
+        if (!/^\d{8,10}$/.test(message)) {
+          response = '⚠️ Por favor ingresa un código estudiantil válido (8-10 dígitos).';
+          break;
+        }
+        state.codigo = message.trim();
+        state.step = "psicologia_edad";
+        response = '📅 ¿Cuál es tu edad?';
+        break;
+
+      case 'psicologia_edad':
+        if (!/^\d+$/.test(message)) {
+          response = '⚠️ Por favor ingresa solo tu edad en números. Ej: 20';
+          break;
+        }
+        const edad = parseInt(message, 10);
+        if (edad < 16 || edad > 80) {
+          response = '⚠️ La edad debe estar entre 16 y 80 años.';
+          break;
+        }
+        state.edad = edad;
+        state.step = "psicologia_carrera";
+        response = '📚 ¿Cuál es tu carrera?';
+        break;
+
+      case 'psicologia_carrera':
+        state.carrera = message.trim();
+        state.step = "psicologia_confirmacion";
+        response = `📋 *Resumen de tu cita de orientación psicológica:*\n\n👤 Nombre: ${state.nombre}\n🎓 Código: ${state.codigo}\n📅 Edad: ${state.edad}\n📚 Carrera: ${state.carrera}\n\n¿Confirmas estos datos?`;
+        await whatsappService.sendMessage(to, response);
+        await this.sendInteractiveButtons(to, "Confirma tu cita:", [
+          { type: "reply", reply: { id: "confirmar", title: "✅ Confirmar" } },
+          { type: "reply", reply: { id: "cancelar", title: "❌ Cancelar" } }
+        ]);
+        return;
+
+      case 'comedor_menu':
+        const comedorOption = message.trim().toLowerCase();
+        if (["1", "menú", "menu", "día", "dia"].some(v => comedorOption.includes(v))) {
+          response = `🍳 *Menú del día - Comedor Universitario*\n\n🥗 *Almuerzo:*\n• Sopa del día\n• Carne o pollo con arroz y ensalada\n• Postre casero\n• Jugo natural\n\n🥪 *Cena:*\n• Sándwich de pollo o atún\n• Fruta de temporada\n• Bebida\n\n💰 Precio: $8.000 COP`;
+        } else if (["2", "horarios", "servicio"].some(v => comedorOption.includes(v))) {
+          response = `🕐 *Horarios del Comedor Universitario:*\n\n🌅 *Desayuno:* 6:30 AM - 9:00 AM\n🍽️ *Almuerzo:* 11:30 AM - 2:30 PM\n🌙 *Cena:* 5:30 PM - 8:00 PM\n\n📍 Ubicación: Edificio de Bienestar Universitario`;
+        } else if (["3", "precios", "pago", "formas"].some(v => comedorOption.includes(v))) {
+          response = `💰 *Precios y Formas de Pago:*\n\n🍳 Desayuno: $5.000 COP\n🍽️ Almuerzo: $8.000 COP\n🌙 Cena: $6.000 COP\n\n💳 Formas de pago:\n• Efectivo\n• Tarjeta débito/crédito\n• Consignación bancaria\n• Pago con código estudiantil`;
+        } else if (["4", "nutricional", "nutrición", "nutricion"].some(v => comedorOption.includes(v))) {
+          response = `📊 *Información Nutricional:*\n\n🥗 Nuestros menús están diseñados por nutricionistas profesionales para cubrir las necesidades calóricas y nutricionales de los estudiantes.\n\n📋 Cada plato incluye:\n• Proteínas de alta calidad\n• Carbohidratos complejos\n• Vitaminas y minerales\n• Hidratación adecuada\n\n🌱 Opciones vegetarianas disponibles.`;
+        } else if (["5", "sugerencias", "comentarios", "opinión", "opinion"].some(v => comedorOption.includes(v))) {
+          response = `💬 *Sugerencias y Comentarios:*\n\n📧 Email: comedor@univalle.edu.co\n📞 Teléfono: (032) 3212100 ext. 2345\n📱 WhatsApp: +57 300 123 4567\n\nTu opinión es importante para mejorar nuestro servicio. ¡Gracias por tus comentarios!`;
+        } else {
+          response = "❓ Por favor selecciona una opción válida (1-5):\n\n1. Consultar menú del día 🍳\n2. Horarios de servicio 🕐\n3. Precios y formas de pago 💰\n4. Información nutricional 📊\n5. Sugerencias y comentarios 💬";
+        }
+        break;
+
       case 'name':
         if (!/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/.test(message)) {
           response = 'Por favor ingresa solo tu nombre y apellido, sin números ni caracteres especiales.';
@@ -595,42 +667,69 @@ case 'awaitingDayInput':
           break;
   
           case "confirmation":
+          case "psicologia_confirmacion":
             if (message === "confirmar") {
               try {
-                const existingAppointments = await getAppointments();
-                const alreadyRegistered = existingAppointments.some(
-                  (appointment) =>
-                    appointment.name === state.name &&
-                    appointment.day === state.day &&
-                    appointment.reason === state.reason
-                );
-          
-                if (alreadyRegistered) {
+                // Verificar si es una cita de psicología o una cita regular
+                if (state.step === "psicologia_confirmacion") {
+                  // Cita de psicología
+                  const psicologiaRow = [
+                    to, // Teléfono
+                    state.nombre,
+                    state.codigo,
+                    state.edad,
+                    state.carrera,
+                    "Cita de Orientación Psicológica",
+                    new Date().toLocaleString("es-CO", { timeZone: "America/Bogota" }),
+                    "Pendiente" // Estado
+                  ];
+                  
+                  console.log('Guardando cita de psicología en sheets:', psicologiaRow);
+                  const result = await appendToSheet(psicologiaRow);
+                  console.log('Resultado de sheets psicología:', result);
+                  
                   await whatsappService.sendMessage(
                     to,
-                    "📌 Ya tienes una clase agendada con esos datos. Si necesitas cambiarla, responde con *cancelar* y vuelve a intentarlo.",
+                    "✅ ¡Tu cita de orientación psicológica ha sido agendada exitosamente!\n\n📞 Un psicólogo se pondrá en contacto contigo en las próximas 24 horas para confirmar la fecha y hora de tu cita.\n\n🧠 Recuerda que este servicio es completamente gratuito para estudiantes de la Universidad del Valle.",
                     messageId
                   );
                 } else {
-                  const row = [
-                    to,
-                    state.name,
-                    state.age,
-                    state.day,
-                    state.reason,
-                    state.hour,
-                    new Date().toLocaleString("es-CO", { timeZone: "America/Bogota" })
-                  ];
-                  
-                  console.log('Intentando guardar en sheets:', row);
-                  const result = await appendToSheet(row);
-                  console.log('Resultado de sheets:', result);
-                  
-                  await whatsappService.sendMessage(
-                    to,
-                    "✅ ¡Tu clase ha sido agendada y registrada! Nos pondremos en contacto contigo en un momento para confirmar la fecha y hora. ¡Nos vemos pronto! 💪",
-                    messageId
+                  // Cita regular (mantener lógica existente)
+                  const existingAppointments = await getAppointments();
+                  const alreadyRegistered = existingAppointments.some(
+                    (appointment) =>
+                      appointment.name === state.name &&
+                      appointment.day === state.day &&
+                      appointment.reason === state.reason
                   );
+            
+                  if (alreadyRegistered) {
+                    await whatsappService.sendMessage(
+                      to,
+                      "📌 Ya tienes una clase agendada con esos datos. Si necesitas cambiarla, responde con *cancelar* y vuelve a intentarlo.",
+                      messageId
+                    );
+                  } else {
+                    const row = [
+                      to,
+                      state.name,
+                      state.age,
+                      state.day,
+                      state.reason,
+                      state.hour,
+                      new Date().toLocaleString("es-CO", { timeZone: "America/Bogota" })
+                    ];
+                    
+                    console.log('Intentando guardar en sheets:', row);
+                    const result = await appendToSheet(row);
+                    console.log('Resultado de sheets:', result);
+                    
+                    await whatsappService.sendMessage(
+                      to,
+                      "✅ ¡Tu clase ha sido agendada y registrada! Nos pondremos en contacto contigo en un momento para confirmar la fecha y hora. ¡Nos vemos pronto! 💪",
+                      messageId
+                    );
+                  }
                 }
               } catch (err) {
                 console.error("❌ Error al procesar la cita en messageHandler:", err);
@@ -854,13 +953,13 @@ case "pausar_motivo":
     console.log(`[recordGeminiQuery] Uso de IA para ${from} registrado:`, usage);
   }
 
-  // 🆕 Función para verificar y enviar recordatorios de renovación de membresía
+  // 🆕 Función para verificar y enviar recordatorios de citas psicológicas
   async checkAndSendMembershipReminders() {
-    console.log('[checkAndSendMembershipReminders] Iniciando verificación de recordatorios de membresía...');
+    console.log('[checkAndSendMembershipReminders] Iniciando verificación de recordatorios de citas psicológicas...');
     try {
       const activeMemberships = await getAllActiveMemberships();
       if (!activeMemberships || activeMemberships.length === 0) {
-        console.log('[checkAndSendMembershipReminders] No hay membresías activas para verificar.');
+        console.log('[checkAndSendMembershipReminders] No hay citas psicológicas activas para verificar.');
         return;
       }
 
@@ -871,7 +970,7 @@ case "pausar_motivo":
 
       for (const member of activeMemberships) {
         if (!member.fechaFin || !member.telefono || !member.nombre) {
-          console.warn(`[checkAndSendMembershipReminders] Datos incompletos para miembro: ${JSON.stringify(member)}, saltando.`);
+          console.warn(`[checkAndSendMembershipReminders] Datos incompletos para estudiante: ${JSON.stringify(member)}, saltando.`);
           continue;
         }
 
@@ -885,7 +984,7 @@ case "pausar_motivo":
         console.log(`[checkAndSendMembershipReminders] Verificando a ${member.nombre} (Tel: ${member.telefono}). Fecha Fin: ${member.fechaFin.toISOString().split('T')[0]}, Días restantes: ${daysRemaining}`);
 
         if (daysRemaining === 2) {
-          const reminderMessage = `¡Hola ${member.nombre}! 👋 Te recordamos que tu membresía en GymBro está por vencer en 2 días (${endDate.toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' })}). No olvides acercarte a nuestras instalaciones para renovarla y seguir disfrutando de todos los beneficios. ¡Te esperamos! 💪`;
+          const reminderMessage = `¡Hola ${member.nombre}! 👋 Te recordamos que tu cita de orientación psicológica en el área de Bienestar Universitario está programada para mañana. No olvides asistir a tu cita y recuerda que este servicio es completamente gratuito para estudiantes de la Universidad del Valle. ¡Te esperamos! 🧠❤️`;
           try {
             await whatsappService.sendMessage(member.telefono, reminderMessage);
             console.log(`[checkAndSendMembershipReminders] ✅ Recordatorio enviado a ${member.nombre} (Tel: ${member.telefono})`);

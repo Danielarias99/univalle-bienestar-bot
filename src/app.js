@@ -8,10 +8,17 @@ app.use(express.json());
 app.use('/', webhookRoutes);
 
 app.get('/', (req, res) => {
-  res.send(`<pre>Nothing to see here.
-Checkout README.md to start.</pre>`);
+  res.send(`<pre>Asistente Virtual de Bienestar Universitario - Universidad del Valle
+      
+Este es el servidor del bot de WhatsApp para el área de Bienestar Universitario.
+      
+Servicios disponibles:
+- Psicología y orientación
+- Comedor universitario
+      
+Para más información, contacta al área de Bienestar Universitario.</pre>`);
 });
 
 app.listen(config.PORT, () => {
-  console.log(`Server is listening on port:  ${config.PORT}`);
+  console.log(`🚀 Servidor del Asistente Virtual de Bienestar Universitario iniciado en puerto: ${config.PORT}`);
 });

@@ -1,8 +1,9 @@
 {
-  "name": "medpet",
+  "name": "univalle-bienestar-bot",
   "version": "1.0.0",
   "main": "server.js",
   "type": "module",
+  "description": "Asistente Virtual de Bienestar Universitario - Universidad del Valle",
   "engines": {
     "node": "^18.x || ^20.x",
     "npm": ">=8.0.0"
@@ -13,10 +14,9 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "echo 'No build step needed'"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": ["whatsapp", "bot", "univalle", "bienestar", "universitario", "psicologia", "comedor"],
+  "author": "Universidad del Valle - Área de Bienestar Universitario",
   "license": "ISC",
-  "description": "",
   "dependencies": {
     "axios": "^1.7.7",
     "dotenv": "^16.4.5",

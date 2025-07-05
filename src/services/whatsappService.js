@@ -118,7 +118,7 @@ class WhatsAppService {
           break;
         case "document":
           // Asegurarse de que el caption sea opcional si no se proporciona
-          mediaObject.document = { link: mediaUrl, filename: "GymBro.pdf" }; 
+          mediaObject.document = { link: mediaUrl, filename: "BienestarUniversitario.pdf" }; 
           if (caption) {
             mediaObject.document.caption = caption;
           }

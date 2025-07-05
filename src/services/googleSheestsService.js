@@ -75,13 +75,13 @@ const appendToSheet = async (data) => {
     }
   }
   try {
-    console.log('📝 Iniciando guardado en hoja Reservas GymBro...');
+    console.log('📝 Iniciando guardado en hoja Citas Bienestar Universitario...');
     const spreadsheetId = "1sNHbR0y52mlRE3z5E8JTaOMktUro3fPm6ZZPxXIUVZY";
-    await addRowToSheet(authClient, spreadsheetId, data, "Reservas GymBro");
-    console.log('✅ Datos de reserva guardados exitosamente.');
-    return "Datos correctamente agregados a la hoja de reservas.";
+    await addRowToSheet(authClient, spreadsheetId, data, "Citas Bienestar Universitario");
+    console.log('✅ Datos de cita guardados exitosamente.');
+    return "Datos correctamente agregados a la hoja de citas.";
   } catch (error) {
-    console.error('❌ Error al guardar en hoja Reservas GymBro:', error);
+    console.error('❌ Error al guardar en hoja Citas Bienestar Universitario:', error);
     throw error; // Propagar para que messageHandler lo capture
   }
 };

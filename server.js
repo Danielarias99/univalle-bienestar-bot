@@ -1,8 +1,8 @@
 /**
- * Copyright (c) Meta Platforms, Inc. and affiliates.
- *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
+ * Asistente Virtual de Bienestar Universitario - Universidad del Valle
+ * 
+ * Este servidor maneja las comunicaciones de WhatsApp para el área de
+ * Bienestar Universitario, incluyendo servicios de psicología y comedor.
  */
 
 import express from "express";
@@ -28,18 +28,25 @@ app.post("/webhook", webhookController.handleIncoming);
 app.get("/webhook", webhookController.verifyWebhook);
 
 app.get("/", (req, res) => {
-  res.send(`<pre>Nothing to see here.
-Checkout README.md to start.</pre>`);
+  res.send(`<pre>Asistente Virtual de Bienestar Universitario - Universidad del Valle
+      
+Este es el servidor del bot de WhatsApp para el área de Bienestar Universitario.
+      
+Servicios disponibles:
+- Psicología y orientación
+- Comedor universitario
+      
+Para más información, contacta al área de Bienestar Universitario.</pre>`);
 });
 
 app.listen(PORT, () => {
-  console.log(`Server is listening on port: ${PORT}`);
+  console.log(`🚀 Servidor del Asistente Virtual de Bienestar Universitario iniciado en puerto: ${PORT}`);
 
-  // Tarea programada para verificar recordatorios de membresía
+  // Tarea programada para verificar recordatorios de citas psicológicas
   const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 horas
   // const CHECK_INTERVAL_MS = 60 * 1000; // Para pruebas: cada minuto
 
-  console.log(`[Server] Programando verificación de recordatorios de membresía cada ${CHECK_INTERVAL_MS / (60 * 60 * 1000)} horas.`);
+  console.log(`[Server] Programando verificación de recordatorios de citas psicológicas cada ${CHECK_INTERVAL_MS / (60 * 60 * 1000)} horas.`);
   
   // Ejecutar una vez al inicio por si el servidor se reinicia en el momento justo
   messageHandlerInstance.checkAndSendMembershipReminders().catch(error => {
