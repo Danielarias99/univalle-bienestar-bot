@@ -318,8 +318,9 @@ async function getAppointments() {
 
 // 🆕 Función para verificar y enviar recordatorios de citas psicológicas
 async function checkAndSendMembershipReminders() {
-  console.log('[checkAndSendMembershipReminders] (Temporal) Recordatorios deshabilitados para evitar errores de encabezados.');
+  console.log('[checkAndSendMembershipReminders] (DESHABILITADO TEMPORALMENTE)');
+  // Esta función está deshabilitada temporalmente para evitar errores de encabezados en Google Sheets.
   return;
 }
 
-export { appendToSheet, appendPauseToSheet, consultarMembresia, getAllActiveMemberships, getAppointments, checkAndSendMembershipReminders };
+export { appendToSheet, appendPauseToSheet, getAppointments, consultarMembresia, getAllActiveMemberships, checkAndSendMembershipReminders };
