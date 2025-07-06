@@ -150,6 +150,7 @@ class WebhookController {
       const token = req.query['hub.verify_token'];
       const challenge = req.query['hub.challenge'];
 
+      console.log('🧪 TOKEN CONFIGURADO:', config.WEBHOOK_VERIFY_TOKEN);
       console.log('🔍 Verificando webhook:', { mode, token: token ? '***' : undefined, challenge });
 
       if (!mode || !token) {
