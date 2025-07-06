@@ -316,4 +316,10 @@ async function getAppointments() {
     }
 }
 
-export { appendToSheet, appendPauseToSheet, getAppointments, consultarMembresia, getAllActiveMemberships };
+// 🆕 Función para verificar y enviar recordatorios de citas psicológicas
+async function checkAndSendMembershipReminders() {
+  console.log('[checkAndSendMembershipReminders] (Temporal) Recordatorios deshabilitados para evitar errores de encabezados.');
+  return;
+}
+
+export { appendToSheet, appendPauseToSheet, consultarMembresia, getAllActiveMemberships, getAppointments, checkAndSendMembershipReminders };
